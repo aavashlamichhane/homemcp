@@ -1,0 +1,29 @@
+[Unit]
+Description=homemcpd host agent
+After=network.target
+
+[Service]
+Type=simple
+User=homemcpd
+Group=homemcp
+SupplementaryGroups=adm systemd-journal
+RuntimeDirectory=homemcpd
+RuntimeDirectoryMode=0750
+UMask=0007
+Environment=NODE_ENV=production
+Environment=AGENT_SOCKET=/run/homemcpd/homemcpd.sock
+Environment=AGENT_HMAC_SECRET_FILE=/etc/homemcp/agent-hmac.secret
+Environment=AGENT_CONFIG_FILE=/etc/homemcp/agent.yaml
+ExecStart=/opt/homemcp/node/bin/node /opt/homemcp/agent/dist/index.js
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

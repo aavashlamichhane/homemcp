@@ -1,0 +1,28 @@
+services:
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    container_name: {{stack_name}}
+    command: ["serve", "--cache-file", "/var/cache/ntfy/cache.db"]
+    restart: unless-stopped
+    mem_limit: {{mem_limit}}
+    pids_limit: {{pids_limit}}
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: {{timezone}}
+      NTFY_BASE_URL: https://{{hostname}}
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+    volumes:
+      - ./cache:/var/cache/ntfy
+      - ./etc:/etc/ntfy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/v1/health | grep -q healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

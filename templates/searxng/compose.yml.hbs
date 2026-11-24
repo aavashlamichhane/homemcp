@@ -1,0 +1,25 @@
+services:
+  searxng:
+    image: searxng/searxng:2025.10.25-3bb5f7d
+    container_name: {{stack_name}}
+    restart: unless-stopped
+    mem_limit: {{mem_limit}}
+    pids_limit: {{pids_limit}}
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SEARXNG_BASE_URL: https://{{hostname}}
+      SEARXNG_SECRET: ${SEARXNG_SECRET}
+    volumes:
+      - ./config:/etc/searxng
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

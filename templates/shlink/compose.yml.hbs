@@ -1,0 +1,26 @@
+services:
+  shlink:
+    image: shlinkio/shlink:4.3.0
+    container_name: {{stack_name}}
+    restart: unless-stopped
+    mem_limit: {{mem_limit}}
+    pids_limit: {{pids_limit}}
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DEFAULT_DOMAIN: {{hostname}}
+      IS_HTTPS_ENABLED: "true"
+      INITIAL_API_KEY: ${SHLINK_INITIAL_API_KEY}
+    volumes:
+      - ./data:/etc/shlink/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/rest/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

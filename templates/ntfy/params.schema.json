@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ntfy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "stack_name": { "type": "string", "default": "ntfy", "pattern": "^[a-z0-9-]+$" },
+    "hostname": { "type": "string", "default": "ntfy.example.com" },
+    "timezone": { "type": "string", "default": "UTC" },
+    "mem_limit": { "type": "string", "default": "128m" },
+    "pids_limit": { "type": "integer", "default": 64 }
+  },
+  "secrets": []
+}

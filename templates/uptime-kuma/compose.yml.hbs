@@ -1,0 +1,22 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.16
+    container_name: {{stack_name}}
+    restart: unless-stopped
+    mem_limit: {{mem_limit}}
+    pids_limit: {{pids_limit}}
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node extra/healthcheck.js || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

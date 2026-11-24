@@ -1,0 +1,20 @@
+services:
+  it-tools:
+    image: corentinth/it-tools:2024.10.22-7ca5933
+    container_name: {{stack_name}}
+    restart: unless-stopped
+    mem_limit: {{mem_limit}}
+    pids_limit: {{pids_limit}}
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

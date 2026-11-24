@@ -8,6 +8,7 @@ import { startAgentServer } from './server.js';
 import { registerBackupActionVerbs } from './verbs/backup-actions.js';
 import { registerBackupReadVerbs } from './verbs/backup-read.js';
 import { registerOpsWriteVerbs } from './verbs/ops-write.js';
+import { registerStacksFilesWriteVerbs } from './verbs/stacks-files-write.js';
 import { registerStacksReadVerbs } from './verbs/stacks-read.js';
 import { registerSystemReadVerbs } from './verbs/system-read.js';
 
@@ -20,6 +21,7 @@ export * from './verbs/stacks-read.js';
 export * from './verbs/backup-read.js';
 export * from './verbs/backup-actions.js';
 export * from './verbs/ops-write.js';
+export * from './verbs/stacks-files-write.js';
 
 interface AgentFileConfig {
   protectedContainers?: string[];
@@ -28,6 +30,7 @@ interface AgentFileConfig {
   knownNoise?: string[];
   stackRoots?: string[];
   mediaRoot?: string;
+  fileRoots?: string[];
   backupStatusDir?: string;
   composeAllow?: Record<string, ComposePolicyAllowEntry>;
 }
@@ -70,6 +73,14 @@ async function main(): Promise<void> {
     protectedUnits: fileCfg.protectedUnits ?? ['ssh.service', 'tailscaled.service', 'homemcpd.service'],
     allowedUnits: fileCfg.allowedUnits ?? [],
     stackRoots: fileCfg.stackRoots ?? [],
+  });
+  registerStacksFilesWriteVerbs(registry, {
+    runner,
+    stacksRoot: fileCfg.stackRoots?.[0] ?? '/home/homelab/docker-containers',
+    extraStackRoots: (fileCfg.stackRoots ?? []).slice(1),
+    allowedFileRoots: fileCfg.fileRoots ?? [],
+    mediaRoot: fileCfg.mediaRoot ?? '/mnt/storage/media',
+    composeAllow: fileCfg.composeAllow ?? {},
   });
 
   const handle = await startAgentServer({ socketPath, hmacSecret, registry, redactor });

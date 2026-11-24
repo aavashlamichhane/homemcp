@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "searxng",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "stack_name": { "type": "string", "default": "searxng", "pattern": "^[a-z0-9-]+$" },
+    "hostname": { "type": "string", "default": "search.example.com" },
+    "mem_limit": { "type": "string", "default": "512m" },
+    "pids_limit": { "type": "integer", "default": 128 }
+  },
+  "secrets": ["SEARXNG_SECRET"]
+}
