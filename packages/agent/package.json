@@ -1,0 +1,24 @@
+{
+  "name": "@homemcp/agent",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@homemcp/core": "workspace:*",
+    "execa": "^9.6.1",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
+  }
+}
