@@ -1,0 +1,28 @@
+# Operational & private server docs (NEVER commit)
+/PLAN.md
+/ops/
+/dev/
+*.bak-*
+*.enc
+
+# Secrets & env
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.pass
+*.secret
+
+# Build, dependencies, data
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+.DS_Store
