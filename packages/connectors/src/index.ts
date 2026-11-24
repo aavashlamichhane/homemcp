@@ -6,3 +6,6 @@ export * from './npm.js';
 export * from './cloudflare.js';
 export * from './vaultwarden.js';
 export * from './http-probe.js';
+export * from './subsonic.js';
+export * from './track-matcher.js';
+export * from './naviload.js';
