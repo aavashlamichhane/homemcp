@@ -48,7 +48,7 @@ export class MockExecutor implements AgentExecutor {
   }
 
   public call<T = unknown>(verb: string, params: Record<string, unknown> = {}): Promise<T> {
-    return Promise.resolve(this.dispatch(verb, params) as T);
+    return Promise.resolve().then(() => this.dispatch(verb, params) as T);
   }
 
   private dispatch(verb: string, params: Record<string, unknown>): unknown {

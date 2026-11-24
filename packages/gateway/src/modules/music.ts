@@ -823,4 +823,58 @@ export function registerMusicModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'music_smart_playlist_create',
+    toolset: 'music',
+    tier: 'T1',
+    description:
+      'Creates a Navidrome Smart Playlist (.nsp) JSON rule file in the stacks/navidrome directory and triggers a library scan.',
+    annotations: {
+      title: 'Create Smart Playlist (.nsp)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        filename: z.string().regex(/^[A-Za-z0-9_-]+\.nsp$/),
+        name: z.string().min(1),
+        comment: z.string().optional(),
+        all: z.array(z.record(z.string(), z.unknown())).optional(),
+        any: z.array(z.record(z.string(), z.unknown())).optional(),
+        sort: z.string().default('lastPlayed'),
+        order: z.enum(['asc', 'desc']).default('desc'),
+        limit: z.number().int().min(1).max(500).default(50),
+      })
+      .strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args) => {
+      if (!args.all && !args.any) {
+        throw new HomemcpError('INVALID_ARGUMENT', 'Smart playlist requires at least "all" or "any" rule array');
+      }
+      const nspDoc = {
+        name: args.name,
+        ...(args.comment ? { comment: args.comment } : {}),
+        ...(args.all ? { all: args.all } : {}),
+        ...(args.any ? { any: args.any } : {}),
+        sort: args.sort,
+        order: args.order,
+        limit: args.limit,
+      };
+      const targetPath = `${deps.config.policy.roots.stacks}/navidrome/${args.filename}`;
+      await deps.agent.call('files.write', {
+        path: targetPath,
+        content: `${JSON.stringify(nspDoc, null, 2)}\n`,
+      });
+      if (deps.subsonic) {
+        await deps.subsonic.startScan(false);
+      }
+      return {
+        summary: `Created smart playlist ${args.filename} at ${targetPath}`,
+        structured: { created: true, path: targetPath, name: args.name },
+      };
+    },
+  });
 }

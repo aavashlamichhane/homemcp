@@ -144,4 +144,56 @@ Highlight anything requiring attention today.`,
       });
     },
   });
+
+  registry.registerPrompt({
+    name: 'deploy_service',
+    title: 'Deploy & Expose Service',
+    description: 'Plan deploying a curated Compose template and optionally exposing it via NPM + Cloudflare',
+    argsSchema: z.object({
+      name: z.string(),
+      template: z.string().default('uptime-kuma'),
+      hostname: z.string().optional(),
+      access: z.boolean().default(false),
+    }),
+    handler: (args) => {
+      const name = typeof args['name'] === 'string' ? args['name'] : 'uptime-kuma';
+      const template = typeof args['template'] === 'string' ? args['template'] : 'uptime-kuma';
+      const hostname = typeof args['hostname'] === 'string' ? args['hostname'] : '';
+      return Promise.resolve({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Deploy service "${name}" using template "${template}"${hostname ? ` and expose at https://${hostname}` : ''}:
+1. Call stacks_template_get({ name: "${template}" }) and stacks_plan({ name: "${name}", template: "${template}" }).
+2. Guide user through confirming the plan URL, then call stacks_apply.
+${hostname ? `3. Call expose_plan({ hostname: "${hostname}", upstream_host: "${name}", upstream_port: ... }) and expose_apply after passkey confirmation.` : ''}`,
+            },
+          },
+        ],
+      });
+    },
+  });
+
+  registry.registerPrompt({
+    name: 'disk_cleanup',
+    title: 'Disk Cleanup Assessment',
+    description: 'Inspect disk usage trends, Docker reclaimable space, and media/files directories safely',
+    handler: () =>
+      Promise.resolve({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Investigate disk usage and safe cleanup options:
+1. Call system_disks(), docker_disk_usage(), and files_disk_usage on media/share roots.
+2. Call docker_prune_plan({ include_build_cache: false }) if Docker bloat is significant.
+3. Recommend safe deletions via files_trash (never permanent rm without user confirmation).`,
+            },
+          },
+        ],
+      }),
+  });
 }

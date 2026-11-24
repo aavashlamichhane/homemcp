@@ -359,4 +359,104 @@ export function registerMediaModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'media_rename_plan',
+    toolset: 'media',
+    tier: 'T0',
+    description:
+      'Plans renaming media files under allowed media roots to Jellyfin conventions (`Title (Year)` / `SxxExx`) before a library scan. Read-only.',
+    annotations: {
+      title: 'Plan Media Rename',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        moves: z
+          .array(z.object({ src: z.string().min(1), dst: z.string().min(1) }))
+          .min(1)
+          .max(100),
+      })
+      .strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: (args, ctx) => {
+      const plan = deps.plans.createPlan({
+        tool: 'media_rename_apply',
+        tier: 'T2',
+        payload: { moves: args.moves },
+        summary: `Rename ${args.moves.length} media file(s) to Jellyfin conventions`,
+        diff: args.moves.map((m) => `- ${m.src}\n+ ${m.dst}`).join('\n'),
+        sideEffects: [`Renames ${args.moves.length} file(s) and triggers Jellyfin scan`],
+        rollback: ['Reverse src/dst pairs with media_rename_plan'],
+        createdBy: ctx.auth.subject,
+      });
+      const chal = deps.confirmations.createChallenge(plan.id, 'url');
+      const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+      return Promise.resolve({
+        summary: `Media rename plan ${plan.id} created`,
+        structured: {
+          plan_id: plan.id,
+          confirmation_id: chal.id,
+          confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          diff: plan.diff,
+        },
+        planId: plan.id,
+        confirmationId: chal.id,
+      });
+    },
+  });
+
+  registry.registerTool({
+    name: 'media_rename_apply',
+    toolset: 'media',
+    tier: 'T2',
+    description: 'Executes a confirmed media rename plan and triggers a Jellyfin library scan.',
+    annotations: {
+      title: 'Apply Media Rename',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({ plan_id: z.string().min(1) }).strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'media_rename_apply',
+        tier: 'T2',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const p = gate.plan.payload as { moves: Array<{ src: string; dst: string }> };
+      for (const m of p.moves) {
+        await deps.agent.call('files.move', { src: m.src, dst: m.dst, overwrite: false });
+      }
+      deps.plans.markApplied(gate.plan.id);
+      return {
+        summary: `Renamed ${p.moves.length} media file(s)`,
+        structured: { applied: true, status: 'applied', renamed_count: p.moves.length },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
+      };
+    },
+  });
 }
