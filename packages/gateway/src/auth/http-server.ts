@@ -181,13 +181,15 @@ export async function startHttpGateway(
     void mcpHandler(String(req.params['toolsets']))(req, res),
   );
 
-  // Interactive login/consent/account/bootstrap UI
+  // Interactive login/consent/account/bootstrap/confirm UI
   registerAuthUiRoutes(app, {
     db: deps.db,
     config: deps.config,
     provider,
     authService,
     pats,
+    plans: deps.plans,
+    confirmations: deps.confirmations,
     mcpResourceUrl,
   });
 

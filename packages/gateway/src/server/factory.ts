@@ -54,7 +54,10 @@ import {
 } from '@homemcp/mock';
 import { HomemcpDb } from '../db/database.js';
 import { PatManager } from '../auth/pats.js';
+import { ConfirmationGate } from '../jobs/confirm.js';
+import { PlanManager } from '../jobs/plans.js';
 import { JobRunner } from '../jobs/runner.js';
+import { SagaRunner } from '../jobs/saga.js';
 import { registerAlertsModule } from '../modules/alerts.js';
 import { registerAppsModule } from '../modules/apps.js';
 import { registerAuthModule } from '../modules/auth.js';
@@ -80,6 +83,9 @@ export interface GatewayDeps {
   registry: HomemcpRegistry;
   pats: PatManager;
   jobs: JobRunner;
+  plans: PlanManager;
+  confirmations: ConfirmationGate;
+  saga: SagaRunner;
   watcher: AlertWatcher;
   agent: AgentExecutor;
   docker?: DockerConnector | undefined;
@@ -215,6 +221,11 @@ export function createGatewayDeps(opts: {
   const pats = new PatManager(db);
   const jobs = new JobRunner(db, redactor);
   jobs.reconcileOnBoot();
+  const plans = new PlanManager(db);
+  const confirmations = new ConfirmationGate(db, plans, {
+    stepUpMaxAge: config.auth.stepUpMaxAge,
+  });
+  const saga = new SagaRunner();
 
   let agent: AgentExecutor;
   let docker: DockerConnector | undefined;
@@ -306,6 +317,9 @@ export function createGatewayDeps(opts: {
     registry,
     pats,
     jobs,
+    plans,
+    confirmations,
+    saga,
     watcher,
     agent,
     docker,

@@ -7,6 +7,8 @@ import express, { type Express, type Request, type Response } from 'express';
 import type Provider from 'oidc-provider';
 import { ALL_SCOPES, type HomemcpConfig, type Scope } from '@homemcp/core';
 import type { HomemcpDb } from '../db/database.js';
+import type { ConfirmationGate } from '../jobs/confirm.js';
+import type { PlanManager } from '../jobs/plans.js';
 import { listOAuthClients, revokeOAuthClientAndGrants } from './adapter.js';
 import type { PatManager } from './pats.js';
 import type { OwnerAuthService } from './webauthn.js';
@@ -125,13 +127,19 @@ export function registerAuthUiRoutes(
     provider: Provider;
     authService: OwnerAuthService;
     pats: PatManager;
+    plans?: PlanManager | undefined;
+    confirmations?: ConfirmationGate | undefined;
     mcpResourceUrl: string;
   },
 ): void {
-  const { db, config, provider, authService, pats } = deps;
+  const { db, config, provider, authService, pats, plans, confirmations } = deps;
 
   app.use((req, res, next) => {
-    if (req.path.startsWith('/oauth/interaction') || req.path.startsWith('/account')) {
+    if (
+      req.path.startsWith('/oauth/interaction') ||
+      req.path.startsWith('/account') ||
+      req.path.startsWith('/confirm')
+    ) {
       const nonce = randomBytes(16).toString('base64');
       res.locals['cspNonce'] = nonce;
       res.setHeader(
@@ -532,5 +540,147 @@ export function registerAuthUiRoutes(
         nonce,
       ),
     );
+  });
+
+  // Out-of-band human confirmation page for T2 & T3 (passkey step-up)
+  app.get('/confirm/:id', (req, res) => {
+    const nonce = String(res.locals['cspNonce'] ?? '');
+    if (!confirmations || !plans) {
+      res.status(404).send(renderLayout('Unavailable', '<p class="err">Confirmation gate disabled.</p>', nonce));
+      return;
+    }
+    const conf = confirmations.getConfirmation(String(req.params['id']));
+    if (!conf) {
+      res.status(404).send(renderLayout('Not Found', '<p class="err">Confirmation not found.</p>', nonce));
+      return;
+    }
+    const plan = plans.getPlan(conf.plan_id);
+    if (!plan) {
+      res.status(404).send(renderLayout('Not Found', '<p class="err">Associated plan not found.</p>', nonce));
+      return;
+    }
+    const sess = getSession(req);
+    const csrf = sess?.csrf ?? randomBytes(16).toString('hex');
+    const isFreshPasskey =
+      sess !== null && Math.floor(Date.now() / 1000) - sess.authTime <= 300;
+    const needsPasskey = plan.tier === 'T3' && !isFreshPasskey;
+
+    const sideEffectsHtml = plan.side_effects
+      .map((s) => `<li>${escapeHtml(s)}</li>`)
+      .join('');
+    const rollbackHtml = plan.rollback
+      .map((s) => `<li>${escapeHtml(s)}</li>`)
+      .join('');
+
+    const html = renderLayout(
+      `Confirm ${plan.tier} Action`,
+      `<h1>Confirm ${escapeHtml(plan.tier)} Operation</h1>
+      <p><strong>Tool:</strong> <code>${escapeHtml(plan.tool)}</code></p>
+      <p>${escapeHtml(plan.summary)}</p>
+      <h3>Diff</h3>
+      <pre>${escapeHtml(plan.diff || '(no diff)')}</pre>
+      <h3>Side Effects</h3>
+      <ul>${sideEffectsHtml || '<li>None documented</li>'}</ul>
+      <h3>Rollback Steps</h3>
+      <ul>${rollbackHtml || '<li>None</li>'}</ul>
+      <p class="muted">Status: <code>${escapeHtml(conf.status)}</code> | Expires: <code>${escapeHtml(conf.expires_at)}</code></p>
+      ${
+        conf.status !== 'pending'
+          ? '<p>Confirmation is no longer pending.</p>'
+          : needsPasskey
+            ? `<div id="pk-box">
+                <p><strong>Passkey verification required</strong> before approving this T3 operation.</p>
+                <div id="pk-err" class="err"></div>
+                <button id="pk-btn" type="button">Verify Passkey &amp; Approve</button>
+              </div>
+              <form method="post" action="/confirm/${escapeHtml(conf.id)}/decision" style="margin-top:1rem">
+                <input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
+                <input type="hidden" name="action" value="reject" />
+                <button class="danger" type="submit">Reject Plan</button>
+              </form>
+              <script nonce="${nonce}">${WEBAUTHN_HELPER_JS}
+              document.getElementById('pk-btn').onclick=async()=>{
+                try{
+                  const r=await runPasskeyAuth('/confirm/${escapeHtml(conf.id)}/webauthn/begin','/confirm/${escapeHtml(conf.id)}/webauthn/finish',{});
+                  if(r.ok)location.reload();
+                }catch(e){document.getElementById('pk-err').textContent=e.message;}
+              };</script>`
+            : `<form method="post" action="/confirm/${escapeHtml(conf.id)}/decision" style="display:inline-block;margin-right:.75rem">
+                <input type="hidden" name="csrf" value="${escapeHtml(sess?.csrf ?? '')}" />
+                <input type="hidden" name="action" value="approve" />
+                <button type="submit">Approve Plan</button>
+              </form>
+              <form method="post" action="/confirm/${escapeHtml(conf.id)}/decision" style="display:inline-block">
+                <input type="hidden" name="csrf" value="${escapeHtml(sess?.csrf ?? '')}" />
+                <input type="hidden" name="action" value="reject" />
+                <button class="danger" type="submit">Reject</button>
+              </form>`
+      }`,
+      nonce,
+    );
+    res.type('html').send(html);
+  });
+
+  app.post('/confirm/:id/webauthn/begin', async (req, res) => {
+    try {
+      const id = String(req.params['id']);
+      res.json(await authService.beginPasskeyAuthentication(`confirm:${id}`));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed' });
+    }
+  });
+
+  app.post('/confirm/:id/webauthn/finish', express.json(), async (req, res) => {
+    if (!confirmations) {
+      res.status(404).json({ error: 'Unavailable' });
+      return;
+    }
+    try {
+      const id = String(req.params['id']);
+      const body = req.body as { response?: AuthenticationResponseJSON };
+      if (!body.response) {
+        res.status(400).json({ error: 'Missing assertion' });
+        return;
+      }
+      const verified = await authService.finishPasskeyAuthentication(`confirm:${id}`, body.response);
+      setSession(res, verified.authTime);
+      confirmations.approveConfirmation(id, {
+        approvedBy: config.auth.owner.name,
+        method: 'url',
+        authTime: verified.authTime,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(403).json({ error: err instanceof Error ? err.message : 'Failed' });
+    }
+  });
+
+  app.post('/confirm/:id/decision', express.urlencoded({ extended: false }), (req, res) => {
+    if (!confirmations) {
+      res.status(404).send('Unavailable');
+      return;
+    }
+    const id = String(req.params['id']);
+    const body = req.body as { action?: string; csrf?: string };
+    if (body.action === 'reject') {
+      confirmations.rejectConfirmation(id);
+      res.redirect(`/confirm/${id}`);
+      return;
+    }
+    const sess = getSession(req);
+    if (!sess || body.csrf !== sess.csrf) {
+      res.status(403).send('Session & CSRF verification required');
+      return;
+    }
+    try {
+      confirmations.approveConfirmation(id, {
+        approvedBy: config.auth.owner.name,
+        method: 'url',
+        authTime: sess.authTime,
+      });
+      res.redirect(`/confirm/${id}`);
+    } catch (err) {
+      res.status(403).send(err instanceof Error ? err.message : 'Forbidden');
+    }
   });
 }
