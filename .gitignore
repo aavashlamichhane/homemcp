@@ -26,3 +26,4 @@ coverage/
 *.db-shm
 *.sqlite*
 .DS_Store
+/evals/results/

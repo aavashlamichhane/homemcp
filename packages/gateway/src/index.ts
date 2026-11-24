@@ -1,3 +1,4 @@
+export { InMemoryTransport, type JSONRPCMessage } from '@modelcontextprotocol/server';
 export * from './db/database.js';
 export * from './jobs/runner.js';
 export * from './jobs/plans.js';

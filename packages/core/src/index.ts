@@ -1,3 +1,4 @@
+export { parse as parseYaml } from 'yaml';
 export * from './types.js';
 export * from './errors.js';
 export * from './tiers.js';

@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "docs:generate": "tsx scripts/generate-docs.ts",
-    "check:secrets": "tsx scripts/check-secrets.ts"
+    "check:secrets": "tsx scripts/check-secrets.ts",
+    "eval": "tsx evals/runner.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
