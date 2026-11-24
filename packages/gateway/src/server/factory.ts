@@ -2,8 +2,12 @@ import { McpServer } from '@modelcontextprotocol/server';
 import {
   HttpCloudflareConnector,
   HttpDockerConnector,
+  HttpHealthchecksConnector,
+  HttpJellyfinConnector,
   HttpNaviloadConnector,
   HttpNpmConnector,
+  HttpNtfyConnector,
+  HttpQbittorrentConnector,
   HttpSubsonicConnector,
   HttpUnixAgentClient,
   HttpVaultwardenConnector,
@@ -12,9 +16,13 @@ import {
   type AgentExecutor,
   type CloudflareConnector,
   type DockerConnector,
+  type HealthchecksConnector,
   type HttpProbeConnector,
+  type JellyfinConnector,
   type NaviloadConnector,
   type NpmConnector,
+  type NtfyConnector,
+  type QbittorrentConnector,
   type RegistryConnector,
   type SubsonicConnector,
   type VaultwardenConnector,
@@ -33,9 +41,13 @@ import {
   MockCloudflareConnector,
   MockDockerConnector,
   MockExecutor,
+  MockHealthchecksConnector,
   MockHttpProbeConnector,
+  MockJellyfinConnector,
   MockNaviloadConnector,
   MockNpmConnector,
+  MockNtfyConnector,
+  MockQbittorrentConnector,
   MockRegistryConnector,
   MockSubsonicConnector,
   MockVaultwardenConnector,
@@ -43,11 +55,14 @@ import {
 import { HomemcpDb } from '../db/database.js';
 import { PatManager } from '../auth/pats.js';
 import { JobRunner } from '../jobs/runner.js';
+import { registerAlertsModule } from '../modules/alerts.js';
 import { registerAppsModule } from '../modules/apps.js';
 import { registerAuthModule } from '../modules/auth.js';
 import { registerBackupModule } from '../modules/backup.js';
 import { registerCoreModule } from '../modules/core.js';
 import { registerDockerModule } from '../modules/docker.js';
+import { registerDownloadsModule } from '../modules/downloads.js';
+import { registerMediaModule } from '../modules/media.js';
 import { registerMusicModule } from '../modules/music.js';
 import { registerNaviloadModule } from '../modules/naviload.js';
 import { registerNetworkModule } from '../modules/network.js';
@@ -55,6 +70,7 @@ import { registerSystemModule } from '../modules/system.js';
 import { registerVaultwardenModule } from '../modules/vaultwarden.js';
 import { registerPrompts } from '../prompts/index.js';
 import { registerResources } from '../resources/index.js';
+import { AlertWatcher } from '../watcher/watcher.js';
 import { HomemcpRegistry } from './registry.js';
 
 export interface GatewayDeps {
@@ -64,6 +80,7 @@ export interface GatewayDeps {
   registry: HomemcpRegistry;
   pats: PatManager;
   jobs: JobRunner;
+  watcher: AlertWatcher;
   agent: AgentExecutor;
   docker?: DockerConnector | undefined;
   ociRegistry: RegistryConnector;
@@ -72,6 +89,10 @@ export interface GatewayDeps {
   vaultwarden?: VaultwardenConnector | undefined;
   subsonic?: SubsonicConnector | undefined;
   naviload?: NaviloadConnector | undefined;
+  jellyfin?: JellyfinConnector | undefined;
+  qbittorrent?: QbittorrentConnector | undefined;
+  ntfy?: NtfyConnector | undefined;
+  healthchecks?: HealthchecksConnector | undefined;
   httpProbe: HttpProbeConnector;
   isMock: boolean;
   version: string;
@@ -151,6 +172,16 @@ export function createDefaultMockConfig(): HomemcpConfig {
         container: 'vaultwarden',
         publicUrl: 'https://vw.example.com',
       },
+      qbittorrent: {
+        url: 'http://192.0.2.10:8080',
+        user: 'admin',
+        password: 'mock-qbit-password',
+        categories: {
+          movies: '/mnt/storage/media/jellyfin/movies',
+          series: '/mnt/storage/media/jellyfin/series',
+          anime: '/mnt/storage/media/jellyfin/anime',
+        },
+      },
     },
   };
 }
@@ -193,6 +224,10 @@ export function createGatewayDeps(opts: {
   let vaultwarden: VaultwardenConnector | undefined;
   let subsonic: SubsonicConnector | undefined;
   let naviload: NaviloadConnector | undefined;
+  let jellyfin: JellyfinConnector | undefined;
+  let qbittorrent: QbittorrentConnector | undefined;
+  let ntfy: NtfyConnector | undefined;
+  let healthchecks: HealthchecksConnector | undefined;
   let httpProbe: HttpProbeConnector;
 
   if (isMock) {
@@ -205,6 +240,10 @@ export function createGatewayDeps(opts: {
     vaultwarden = new MockVaultwardenConnector();
     subsonic = new MockSubsonicConnector(state);
     naviload = new MockNaviloadConnector(state);
+    jellyfin = new MockJellyfinConnector(state);
+    qbittorrent = new MockQbittorrentConnector(state);
+    ntfy = new MockNtfyConnector(state);
+    healthchecks = new MockHealthchecksConnector(state);
     httpProbe = new MockHttpProbeConnector();
   } else {
     agent = new HttpUnixAgentClient({
@@ -231,8 +270,34 @@ export function createGatewayDeps(opts: {
     naviload = config.modules.naviload
       ? new HttpNaviloadConnector(config.modules.naviload)
       : undefined;
+    jellyfin = config.modules.jellyfin
+      ? new HttpJellyfinConnector(config.modules.jellyfin)
+      : undefined;
+    qbittorrent = config.modules.qbittorrent
+      ? new HttpQbittorrentConnector(config.modules.qbittorrent)
+      : undefined;
+    ntfy = config.modules.alerts?.ntfy?.url
+      ? new HttpNtfyConnector({
+          url: config.modules.alerts.ntfy.url,
+          token: config.modules.alerts.ntfy.token,
+        })
+      : undefined;
+    healthchecks = config.modules.alerts?.healthchecks?.pingUrl
+      ? new HttpHealthchecksConnector({ pingUrl: config.modules.alerts.healthchecks.pingUrl })
+      : undefined;
     httpProbe = new NodeHttpProbeConnector();
   }
+
+  const watcher = new AlertWatcher({
+    db,
+    config,
+    redactor,
+    agent,
+    docker,
+    cloudflare,
+    ntfy,
+    healthchecks,
+  });
 
   const deps: GatewayDeps = {
     config,
@@ -241,6 +306,7 @@ export function createGatewayDeps(opts: {
     registry,
     pats,
     jobs,
+    watcher,
     agent,
     docker,
     ociRegistry,
@@ -249,6 +315,10 @@ export function createGatewayDeps(opts: {
     vaultwarden,
     subsonic,
     naviload,
+    jellyfin,
+    qbittorrent,
+    ntfy,
+    healthchecks,
     httpProbe,
     isMock,
     version: opts.version ?? '0.1.0',
@@ -263,6 +333,9 @@ export function createGatewayDeps(opts: {
   registerVaultwardenModule(deps);
   registerMusicModule(deps);
   registerNaviloadModule(deps);
+  registerMediaModule(deps);
+  registerDownloadsModule(deps);
+  registerAlertsModule(deps);
   registerAuthModule(deps, { patManager: pats, publicUrl: config.server.publicUrl });
   registerResources(deps);
   registerPrompts(deps);

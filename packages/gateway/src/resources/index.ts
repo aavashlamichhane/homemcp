@@ -105,4 +105,13 @@ export function registerResources(deps: GatewayDeps): void {
     scope: 'homemcp:audit',
     handler: () => Promise.resolve(JSON.stringify(deps.db.queryAudit({ limit: 100 }), null, 2)),
   });
+
+  registry.registerResource({
+    name: 'alerts-open',
+    uri: 'homemcp://alerts/open',
+    title: 'Open Alerts',
+    description: 'Currently pending and firing alerts evaluated by homemcp watcher',
+    mimeType: 'application/json',
+    handler: () => Promise.resolve(JSON.stringify(deps.watcher.listAlerts({ includeResolved: false }), null, 2)),
+  });
 }

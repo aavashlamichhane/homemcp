@@ -1,0 +1,161 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { InMemoryTransport, type JSONRPCMessage } from '@modelcontextprotocol/server';
+import {
+  createMockState,
+  MockCloudflareConnector,
+  MockDockerConnector,
+  MockExecutor,
+  MockHealthchecksConnector,
+  MockNtfyConnector,
+} from '@homemcp/mock';
+import { Redactor } from '@homemcp/core';
+import { createDefaultMockConfig, createGatewayDeps, buildMcpServer, type GatewayDeps } from '../src/server/factory.js';
+import { HomemcpDb } from '../src/db/database.js';
+import { AlertWatcher } from '../src/watcher/watcher.js';
+
+function createClient(transport: InMemoryTransport) {
+  let nextId = 1;
+  const pending = new Map<number, (msg: Record<string, unknown>) => void>();
+  transport.onmessage = (msg: JSONRPCMessage) => {
+    const rec = msg as unknown as Record<string, unknown>;
+    if (typeof rec['id'] === 'number' && pending.has(rec['id'])) {
+      const resolve = pending.get(rec['id'])!;
+      pending.delete(rec['id']);
+      resolve(rec);
+    }
+  };
+  const call = async (method: string, params: Record<string, unknown> = {}) => {
+    const id = nextId++;
+    const p = new Promise<Record<string, unknown>>((resolve) => pending.set(id, resolve));
+    await transport.send({ jsonrpc: '2.0', id, method, params });
+    return p;
+  };
+  return {
+    init: async () => {
+      await call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'p4-test', version: '1.0.0' },
+      });
+      await transport.send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+    },
+    callTool: async (name: string, args: Record<string, unknown> = {}) => {
+      const res = await call('tools/call', { name, arguments: args });
+      expect(res['error']).toBeUndefined();
+      return res['result'] as { isError?: boolean; structuredContent: Record<string, unknown> };
+    },
+  };
+}
+
+describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
+  const openDbs: Array<{ close: () => void }> = [];
+
+  afterEach(() => {
+    for (const d of openDbs.splice(0)) {
+      d.close();
+    }
+  });
+
+  it('passes U6-run, backup_verify, backup_restore_test, U7 Jellyfin health/problems, and qBittorrent low-space guard', async () => {
+    const deps: GatewayDeps = createGatewayDeps({ mock: true });
+    openDbs.push(deps.db);
+    const server = buildMcpServer(deps);
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st);
+    await ct.start();
+    const client = createClient(ct);
+    await client.init();
+
+    // U6: backup_run, backup_verify, backup_restore_test
+    const runRes = await client.callTool('backup_run', { set: 'vaultwarden' });
+    expect(runRes.structuredContent['status']).toBe('succeeded');
+    expect(runRes.structuredContent['exit_code']).toBe(0);
+
+    const verifyRes = await client.callTool('backup_verify');
+    expect(verifyRes.structuredContent['status']).toBe('succeeded');
+
+    const rtRes = await client.callTool('backup_restore_test', { set: 'vaultwarden' });
+    expect(rtRes.structuredContent['status']).toBe('succeeded');
+    expect(String(rtRes.structuredContent['output'])).toContain('RESTORE_TEST=ok');
+
+    // U7: Jellyfin health & problem finder & run task
+    const jfHealth = await client.callTool('jellyfin_health');
+    expect(jfHealth.structuredContent['healthy']).toBe(true);
+    expect(jfHealth.structuredContent['active_transcodes']).toBe(1);
+
+    const jfProblems = await client.callTool('jellyfin_find_problems', { limit: 50 });
+    expect((jfProblems.structuredContent['unidentified'] as unknown[]).length).toBeGreaterThanOrEqual(1);
+    expect((jfProblems.structuredContent['naming_issues'] as unknown[]).length).toBeGreaterThanOrEqual(1);
+
+    const jfRunTask = await client.callTool('jellyfin_run_task', { task_id_or_name: 'Scan Media Library' });
+    expect(jfRunTask.structuredContent['triggered']).toBe(true);
+
+    // Downloads: valid add succeeds, huge min_free_bytes denied with CONFLICT
+    const dlAddOk = await client.callTool('downloads_add', {
+      url: 'magnet:?xt=urn:btih:abcdef0123456789',
+      category: 'movies',
+      min_free_bytes: 1_000_000,
+    });
+    expect(dlAddOk.structuredContent['added']).toBe(true);
+
+    const dlDenied = await client.callTool('downloads_add', {
+      url: 'magnet:?xt=urn:btih:abcdef0123456789',
+      category: 'movies',
+      min_free_bytes: 9_000_000_000_000, // 9 TB > mock 220 GB free
+    });
+    expect(dlDenied.isError).toBe(true);
+    expect((dlDenied.structuredContent['error'] as { code: string }).code).toBe('CONFLICT');
+
+    await ct.close();
+    await st.close();
+  });
+
+  it('U11: AlertWatcher transitions pending -> firing -> resolved, supports ack/snooze, and flushes offline ntfy queue with outage duration', async () => {
+    const db = new HomemcpDb(':memory:');
+    openDbs.push(db);
+    const config = createDefaultMockConfig();
+    const state = createMockState();
+    const watcher = new AlertWatcher({
+      db,
+      config,
+      redactor: new Redactor(),
+      agent: new MockExecutor(state),
+      docker: new MockDockerConnector(state),
+      cloudflare: new MockCloudflareConnector(state),
+      ntfy: new MockNtfyConnector(state),
+      healthchecks: new MockHealthchecksConnector(state),
+    });
+
+    // Simulate power outage: battery offline AND ntfy unreachable
+    state.acOnline = false;
+    state.ntfyOnline = false;
+
+    const t0 = Date.now();
+    const ev1 = await watcher.evaluateOnce(t0);
+    expect(ev1.pending).toBe(1); // power_on_battery has pending_seconds=60
+    expect(state.ntfySent).toHaveLength(0);
+
+    // 65 seconds later: transitions to firing -> queued because ntfy is still offline
+    const ev2 = await watcher.evaluateOnce(t0 + 65_000);
+    expect(ev2.firing).toBe(1);
+    expect(state.ntfySent).toHaveLength(0);
+
+    // Ack & snooze alert
+    const open = watcher.listAlerts();
+    expect(open).toHaveLength(1);
+    watcher.ackAlert(open[0]!.id, 'owner');
+    watcher.snoozeAlert(open[0]!.id, '1h');
+    expect(watcher.listAlerts()[0]!.acked_by).toBe('owner');
+    expect(watcher.listAlerts()[0]!.snoozed_until).toBeTruthy();
+
+    // Connectivity + AC power restored!
+    state.ntfyOnline = true;
+    state.acOnline = true;
+    const ev3 = await watcher.evaluateOnce(t0 + 130_000);
+    expect(ev3.resolved_count).toBe(1);
+    expect(ev3.flushed_notifications).toBeGreaterThanOrEqual(1);
+    expect(state.ntfySent.some((m) => m.message.includes('outage duration'))).toBe(true);
+    expect(state.ntfySent.some((m) => m.title.includes('[RESOLVED]'))).toBe(true);
+    expect(state.healthchecksPings.length).toBe(3);
+  });
+});

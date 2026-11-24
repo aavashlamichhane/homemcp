@@ -111,4 +111,158 @@ export function registerBackupModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'backup_run',
+    toolset: 'backup',
+    tier: 'T1',
+    description:
+      'Runs an on-demand restic backup for one configured set or "all" via homemcpd as a tracked background job.',
+    annotations: {
+      title: 'Run Restic Backup',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    inputSchema: z
+      .object({
+        set: z.enum([
+          'vaultwarden',
+          'configs',
+          'npm',
+          'navidrome',
+          'system',
+          'jellyfin',
+          'userdata',
+          'all',
+        ]),
+      })
+      .strict(),
+    outputSchema: z.object({
+      job_id: z.string(),
+      set: z.string(),
+      status: z.string(),
+      exit_code: z.number().int(),
+    }),
+    handler: async (args, ctx) => {
+      let exitCode = 1;
+      const job = deps.jobs.startBackground('backup_run', ctx.auth.subject, async (jctx) => {
+        await jctx.addStep(`Starting backup set "${args.set}"`, 15);
+        const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
+          'backup.run',
+          { set: args.set },
+        );
+        exitCode = res.exit_code;
+        if (res.exit_code !== 0) {
+          throw new Error(`Backup failed (exit ${res.exit_code}): ${res.output}`);
+        }
+        await jctx.setProgress(100, `Backup "${args.set}" finished`);
+        return res;
+      });
+      await deps.jobs.waitForJob(job.id);
+      const finalJob = deps.jobs.getJob(job.id)!;
+      return {
+        summary: `Backup set "${args.set}" ${finalJob.status} (job ${job.id})`,
+        structured: {
+          job_id: job.id,
+          set: args.set,
+          status: finalJob.status,
+          exit_code: exitCode,
+        },
+        jobId: job.id,
+      };
+    },
+  });
+
+  registry.registerTool({
+    name: 'backup_verify',
+    toolset: 'backup',
+    tier: 'T1',
+    description: 'Runs restic repository maintenance and integrity check (`homemcp-backup maint`) as a tracked job.',
+    annotations: {
+      title: 'Verify Backup Repository',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    outputSchema: z.object({
+      job_id: z.string(),
+      status: z.string(),
+      exit_code: z.number().int(),
+    }),
+    handler: async (_args, ctx) => {
+      let exitCode = 1;
+      const job = deps.jobs.startBackground('backup_verify', ctx.auth.subject, async (jctx) => {
+        await jctx.addStep('Running restic check & forget/prune', 20);
+        const res = await deps.agent.call<{ exit_code: number; output: string }>('backup.verify');
+        exitCode = res.exit_code;
+        if (res.exit_code !== 0) {
+          throw new Error(`Verify failed (exit ${res.exit_code}): ${res.output}`);
+        }
+        return res;
+      });
+      await deps.jobs.waitForJob(job.id);
+      const finalJob = deps.jobs.getJob(job.id)!;
+      return {
+        summary: `Backup verification ${finalJob.status} (job ${job.id})`,
+        structured: { job_id: job.id, status: finalJob.status, exit_code: exitCode },
+        jobId: job.id,
+      };
+    },
+  });
+
+  registry.registerTool({
+    name: 'backup_restore_test',
+    toolset: 'backup',
+    tier: 'T1',
+    description:
+      'Runs an automated temporary restore integrity test for Vaultwarden (`homemcp-backup restore-test vaultwarden`).',
+    annotations: {
+      title: 'Test Backup Restore',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({ set: z.enum(['vaultwarden']).default('vaultwarden') }).strict(),
+    outputSchema: z.object({
+      job_id: z.string(),
+      set: z.string(),
+      status: z.string(),
+      exit_code: z.number().int(),
+      output: z.string(),
+    }),
+    handler: async (args, ctx) => {
+      let exitCode = 1;
+      let output = '';
+      const job = deps.jobs.startBackground('backup_restore_test', ctx.auth.subject, async (jctx) => {
+        await jctx.addStep(`Running temporary restore test for ${args.set}`, 25);
+        const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
+          'backup.restore_test',
+          { set: args.set },
+        );
+        exitCode = res.exit_code;
+        output = res.output;
+        if (res.exit_code !== 0) {
+          throw new Error(`Restore test failed: ${res.output}`);
+        }
+        return res;
+      });
+      await deps.jobs.waitForJob(job.id);
+      const finalJob = deps.jobs.getJob(job.id)!;
+      return {
+        summary: `Restore test (${args.set}) ${finalJob.status}`,
+        structured: {
+          job_id: job.id,
+          set: args.set,
+          status: finalJob.status,
+          exit_code: exitCode,
+          output,
+        },
+        jobId: job.id,
+      };
+    },
+  });
 }

@@ -80,4 +80,68 @@ Report any findings sorted by severity.`,
       });
     },
   });
+
+  registry.registerPrompt({
+    name: 'daily_briefing',
+    title: 'Daily Server Briefing',
+    description: 'Summarize open alerts, host health, backup freshness, downloads, and media sessions',
+    handler: () =>
+      Promise.resolve({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Prepare a concise daily briefing:
+1. Call homemcp_overview(), alerts_list({ include_resolved: false }), and backup_status().
+2. Call jellyfin_health() and downloads_status({ filter: "all" }) if enabled.
+Highlight anything requiring attention today.`,
+            },
+          },
+        ],
+      }),
+  });
+
+  registry.registerPrompt({
+    name: 'weekly_health_report',
+    title: 'Weekly Health Report',
+    description: 'Summarize 7-day disk trends, journal errors, updates, and backup integrity',
+    handler: () =>
+      Promise.resolve({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Compile a weekly health report:
+1. Call system_disks(), system_errors_summary({ since: "7d" }), and system_updates().
+2. Call backup_status(), network_audit(), and jellyfin_find_problems({ limit: 50 }).`,
+            },
+          },
+        ],
+      }),
+  });
+
+  registry.registerPrompt({
+    name: 'restore_drill',
+    title: 'Backup Restore Drill',
+    description: 'Verify backup integrity and perform a safe restore test for a set',
+    argsSchema: z.object({ set: z.string().default('vaultwarden') }),
+    handler: (args) => {
+      const set = typeof args['set'] === 'string' ? args['set'] : 'vaultwarden';
+      return Promise.resolve({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Run a non-destructive restore drill for "${set}":
+1. Call backup_status({ set: "${set}" }) and backup_snapshots({ set: "${set}" }).
+2. Call backup_restore_test({ set: "vaultwarden" }) (or backup_verify() for repository verification).`,
+            },
+          },
+        ],
+      });
+    },
+  });
 }

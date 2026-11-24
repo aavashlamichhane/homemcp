@@ -95,3 +95,11 @@ export const P1_ALLOWED_BINARIES = [
   '/bin/df',
   '/bin/ps',
 ] as const;
+
+export const AGENT_ALLOWED_BINARIES = [
+  ...P1_ALLOWED_BINARIES,
+  '/usr/bin/sudo',
+  '/usr/bin/docker',
+  '/sbin/shutdown',
+  '/usr/sbin/shutdown',
+] as const;

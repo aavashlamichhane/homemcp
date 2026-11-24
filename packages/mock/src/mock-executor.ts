@@ -22,6 +22,9 @@ export class MockExecutor implements AgentExecutor {
         'system.services',
         'stacks.scan',
         'backup.read_status',
+        'backup.run',
+        'backup.verify',
+        'backup.restore_test',
       ],
     });
   }
@@ -227,6 +230,50 @@ export class MockExecutor implements AgentExecutor {
           snapshots: this.state.backupSnapshots,
           stats: this.state.backupStats,
         };
+
+      case 'backup.run': {
+        const set = typeof params['set'] === 'string' ? params['set'] : 'vaultwarden';
+        const allowed = ['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata', 'all'];
+        if (!allowed.includes(set)) {
+          throw new HomemcpError('INVALID_ARGUMENT', `Unknown backup set: ${set}`);
+        }
+        const targets = set === 'all' ? ['vaultwarden', 'configs'] : [set];
+        const now = new Date().toISOString();
+        for (const t of targets) {
+          const snapId = `snap_${t}_${Date.now().toString(36).slice(-4)}`;
+          this.state.backupStatus[t] = {
+            last_status: 'success',
+            last_success: now,
+            last_bytes_added: 128_000,
+            last_snapshot: snapId,
+          };
+          this.state.backupSnapshots.push({
+            id: snapId,
+            time: now,
+            tags: [`set=${t}`],
+            paths: [`/var/lib/homemcp/backup/staging/${t}`],
+          });
+        }
+        return { set, exit_code: 0, output: `Backup complete for ${set}` };
+      }
+
+      case 'backup.verify':
+        return { exit_code: 0, output: 'restic check passed: no errors' };
+
+      case 'backup.restore_test': {
+        const now = new Date().toISOString();
+        const prev = (this.state.backupStatus['vaultwarden'] as Record<string, unknown> | undefined) ?? {};
+        this.state.backupStatus['vaultwarden'] = {
+          ...prev,
+          last_restore_test: {
+            time: now,
+            status: 'ok',
+            restored_ciphers: 142,
+            live_ciphers: 142,
+          },
+        };
+        return { set: 'vaultwarden', exit_code: 0, output: 'RESTORE_TEST=ok restored_ciphers=142 live_ciphers=142' };
+      }
 
       case 'files.read': {
         const p = typeof params['path'] === 'string' ? params['path'] : '';

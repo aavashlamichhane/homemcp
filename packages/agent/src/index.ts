@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { Redactor, type ComposePolicyAllowEntry } from '@homemcp/core';
-import { ExecaCommandRunner, P1_ALLOWED_BINARIES } from './exec.js';
+import { AGENT_ALLOWED_BINARIES, ExecaCommandRunner } from './exec.js';
 import { VerbRegistry } from './registry.js';
 import { startAgentServer } from './server.js';
+import { registerBackupActionVerbs } from './verbs/backup-actions.js';
 import { registerBackupReadVerbs } from './verbs/backup-read.js';
 import { registerStacksReadVerbs } from './verbs/stacks-read.js';
 import { registerSystemReadVerbs } from './verbs/system-read.js';
@@ -16,6 +17,7 @@ export * from './server.js';
 export * from './verbs/system-read.js';
 export * from './verbs/stacks-read.js';
 export * from './verbs/backup-read.js';
+export * from './verbs/backup-actions.js';
 
 interface AgentFileConfig {
   allowedUnits?: string[];
@@ -42,7 +44,7 @@ async function main(): Promise<void> {
   }
 
   const registry = new VerbRegistry();
-  const runner = new ExecaCommandRunner(P1_ALLOWED_BINARIES);
+  const runner = new ExecaCommandRunner(AGENT_ALLOWED_BINARIES);
   const redactor = new Redactor();
   redactor.registerSecret(hmacSecret);
 
@@ -57,6 +59,7 @@ async function main(): Promise<void> {
     composeAllow: fileCfg.composeAllow ?? {},
   });
   registerBackupReadVerbs(registry, fileCfg.backupStatusDir ?? '/var/lib/homemcp/backup');
+  registerBackupActionVerbs(registry, runner);
 
   const handle = await startAgentServer({ socketPath, hmacSecret, registry, redactor });
   process.stderr.write(`homemcpd listening on ${handle.address}\n`);

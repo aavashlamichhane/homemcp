@@ -1,0 +1,14 @@
+# Least-privilege sudoers policy for homemcpd (installed to /etc/sudoers.d/homemcpd, mode 0440)
+# Validate before activation with: visudo -cf /etc/sudoers.d/homemcpd
+Defaults:homemcpd !lecture, !authenticate
+
+homemcpd ALL=(root) NOPASSWD: /usr/local/sbin/homemcp-backup run vaultwarden, \
+  /usr/local/sbin/homemcp-backup run configs, \
+  /usr/local/sbin/homemcp-backup run npm, \
+  /usr/local/sbin/homemcp-backup run navidrome, \
+  /usr/local/sbin/homemcp-backup run system, \
+  /usr/local/sbin/homemcp-backup run jellyfin, \
+  /usr/local/sbin/homemcp-backup run userdata, \
+  /usr/local/sbin/homemcp-backup run all, \
+  /usr/local/sbin/homemcp-backup maint, \
+  /usr/local/sbin/homemcp-backup restore-test vaultwarden
