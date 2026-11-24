@@ -8,10 +8,7 @@ export const TIER_REQUIRED_SCOPE: Record<Tier, Scope> = {
   T3: 'homemcp:admin',
 };
 
-export function requiredScopeForTool(
-  tier: Tier,
-  explicitScope?: Scope,
-): Scope {
+export function requiredScopeForTool(tier: Tier, explicitScope?: Scope): Scope {
   return explicitScope ?? TIER_REQUIRED_SCOPE[tier];
 }
 
@@ -21,9 +18,7 @@ export function hasRequiredScope(grantedScopes: readonly string[], required: Sco
   }
   // homemcp:admin implies operate & read; homemcp:operate implies read
   if (required === 'homemcp:read') {
-    return (
-      grantedScopes.includes('homemcp:operate') || grantedScopes.includes('homemcp:admin')
-    );
+    return grantedScopes.includes('homemcp:operate') || grantedScopes.includes('homemcp:admin');
   }
   if (required === 'homemcp:operate') {
     return grantedScopes.includes('homemcp:admin');

@@ -157,7 +157,9 @@ export function registerSystemReadVerbs(registry: VerbRegistry, cfg: SystemVerbC
           }
         | undefined;
       if (await exists(batBase)) {
-        const cap = Number((await readTextOptional(path.join(batBase, 'capacity')))?.trim() ?? 'NaN');
+        const cap = Number(
+          (await readTextOptional(path.join(batBase, 'capacity')))?.trim() ?? 'NaN',
+        );
         const statusStr = (await readTextOptional(path.join(batBase, 'status')))?.trim();
         const full = Number(
           (await readTextOptional(path.join(batBase, 'charge_full')))?.trim() ?? 'NaN',
@@ -203,9 +205,7 @@ export function registerSystemReadVerbs(registry: VerbRegistry, cfg: SystemVerbC
           ['-k', '--since', '-24h', '--grep=Out of memory|oom-kill', '--output=json', '--no-pager'],
           { allowNonZero: true },
         );
-        oomEvents = oomRes.stdout
-          .split('\n')
-          .filter((l) => l.trim().startsWith('{')).length;
+        oomEvents = oomRes.stdout.split('\n').filter((l) => l.trim().startsWith('{')).length;
       } catch {
         oomEvents = 0;
       }
@@ -233,7 +233,10 @@ export function registerSystemReadVerbs(registry: VerbRegistry, cfg: SystemVerbC
     inputSchema: z
       .object({
         group: z.enum(['cpu', 'mem', 'io', 'net', 'load']).default('cpu'),
-        day: z.string().regex(/^\d{2}$/).optional(),
+        day: z
+          .string()
+          .regex(/^\d{2}$/)
+          .optional(),
         max_points: z.number().int().min(10).max(120).default(120),
       })
       .strict(),
@@ -303,7 +306,9 @@ export function registerSystemReadVerbs(registry: VerbRegistry, cfg: SystemVerbC
       ),
     }),
     handler: async () => {
-      const dfRes = await cfg.runner.run('/usr/bin/df', ['-B1', '-P', '-T'], { allowNonZero: false });
+      const dfRes = await cfg.runner.run('/usr/bin/df', ['-B1', '-P', '-T'], {
+        allowNonZero: false,
+      });
       const inodeRes = await cfg.runner.run('/usr/bin/df', ['-i', '-P'], { allowNonZero: true });
 
       const inodeMap = new Map<string, { total: number; used: number }>();
@@ -367,8 +372,7 @@ export function registerSystemReadVerbs(registry: VerbRegistry, cfg: SystemVerbC
           const poh = (parsed['power_on_time'] as { hours?: number } | undefined)?.hours;
           const attrs = (
             parsed['ata_smart_attributes'] as
-              | { table?: Array<{ id?: number; raw?: { value?: number } }> }
-              | undefined
+              { table?: Array<{ id?: number; raw?: { value?: number } }> } | undefined
           )?.table;
           const realloc = attrs?.find((a) => a.id === 5)?.raw?.value;
           const pending = attrs?.find((a) => a.id === 197)?.raw?.value;
@@ -618,7 +622,13 @@ export function registerSystemReadVerbs(registry: VerbRegistry, cfg: SystemVerbC
             existing.count++;
           } else {
             const knownNoise = cfg.knownNoise.some((pat) => msg.includes(pat));
-            groups.set(key, { signature: sig, unit, count: 1, known_noise: knownNoise, sample: msg });
+            groups.set(key, {
+              signature: sig,
+              unit,
+              count: 1,
+              known_noise: knownNoise,
+              sample: msg,
+            });
           }
         } catch {
           // skip

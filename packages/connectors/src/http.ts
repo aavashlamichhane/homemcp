@@ -8,10 +8,7 @@ export interface HttpJsonOptions {
   serviceName: string;
 }
 
-export async function fetchWithTimeout(
-  url: string,
-  opts: HttpJsonOptions,
-): Promise<Response> {
+export async function fetchWithTimeout(url: string, opts: HttpJsonOptions): Promise<Response> {
   const controller = new AbortController();
   const timeout = opts.timeoutMs ?? 10_000;
   const timer = setTimeout(() => controller.abort(), timeout);

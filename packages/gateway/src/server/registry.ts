@@ -55,11 +55,7 @@ export interface RegisteredResourceSpec {
   description: string;
   mimeType: string;
   scope?: Scope | undefined;
-  handler: (
-    uri: URL,
-    vars: Record<string, string>,
-    auth: AuthContext,
-  ) => Promise<string>;
+  handler: (uri: URL, vars: Record<string, string>, auth: AuthContext) => Promise<string>;
 }
 
 export interface RegisteredPromptSpec {
@@ -150,9 +146,7 @@ export class HomemcpRegistry {
         tokenId: typeof extraTid === 'string' ? extraTid : 'unknown',
         scopes: httpAuth.scopes,
         authTime:
-          typeof httpAuth.extra?.['authTime'] === 'number'
-            ? httpAuth.extra['authTime']
-            : undefined,
+          typeof httpAuth.extra?.['authTime'] === 'number' ? httpAuth.extra['authTime'] : undefined,
       };
     };
 
@@ -184,10 +178,7 @@ export class HomemcpRegistry {
 
         try {
           if (!hasRequiredScope(auth.scopes, reqScope)) {
-            throw new HomemcpError(
-              'POLICY_DENIED',
-              `Missing required scope: ${reqScope}`,
-            );
+            throw new HomemcpError('POLICY_DENIED', `Missing required scope: ${reqScope}`);
           }
 
           const out = await tool.handler(args, { auth, mcpCtx });
@@ -204,10 +195,7 @@ export class HomemcpRegistry {
             );
           }
 
-          const rawResult = buildToolResult(
-            out.summary,
-            parsedOut.data as Record<string, unknown>,
-          );
+          const rawResult = buildToolResult(out.summary, parsedOut.data as Record<string, unknown>);
           const redacted = deps.redactor.redactValue(rawResult).value;
           return redacted;
         } catch (err) {
@@ -342,7 +330,8 @@ export class HomemcpRegistry {
           ...(pr.argsSchema ? { argsSchema: pr.argsSchema as never } : {}),
         },
         async (a: unknown) => {
-          const args = pr.argsSchema && typeof a === 'object' && a ? (a as Record<string, unknown>) : {};
+          const args =
+            pr.argsSchema && typeof a === 'object' && a ? (a as Record<string, unknown>) : {};
           const res = await pr.handler(args);
           return deps.redactor.redactValue(res).value;
         },

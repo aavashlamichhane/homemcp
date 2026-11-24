@@ -43,16 +43,20 @@ export function registerNetworkModule(deps: GatewayDeps): void {
       dead_count: z.number().int(),
     }),
     handler: async ({ probe }) => {
-      const [npmHosts, tunnelCfg, dnsRecords, accessApps, containers, secAudit] = await Promise.all([
-        deps.npm ? deps.npm.listProxyHosts().catch(() => []) : Promise.resolve([]),
-        deps.cloudflare ? deps.cloudflare.getTunnelConfig().catch(() => null) : Promise.resolve(null),
-        deps.cloudflare ? deps.cloudflare.listDnsRecords().catch(() => []) : Promise.resolve([]),
-        deps.cloudflare ? deps.cloudflare.listAccessApps().catch(() => []) : Promise.resolve([]),
-        deps.docker ? deps.docker.listContainers(true).catch(() => []) : Promise.resolve([]),
-        deps.agent
-          .call<{ listening_sockets: Array<{ port: string }> }>('system.security_audit')
-          .catch(() => ({ listening_sockets: [] })),
-      ]);
+      const [npmHosts, tunnelCfg, dnsRecords, accessApps, containers, secAudit] = await Promise.all(
+        [
+          deps.npm ? deps.npm.listProxyHosts().catch(() => []) : Promise.resolve([]),
+          deps.cloudflare
+            ? deps.cloudflare.getTunnelConfig().catch(() => null)
+            : Promise.resolve(null),
+          deps.cloudflare ? deps.cloudflare.listDnsRecords().catch(() => []) : Promise.resolve([]),
+          deps.cloudflare ? deps.cloudflare.listAccessApps().catch(() => []) : Promise.resolve([]),
+          deps.docker ? deps.docker.listContainers(true).catch(() => []) : Promise.resolve([]),
+          deps.agent
+            .call<{ listening_sockets: Array<{ port: string }> }>('system.security_audit')
+            .catch(() => ({ listening_sockets: [] })),
+        ],
+      );
 
       const listeningPorts = new Set(secAudit.listening_sockets.map((s) => Number(s.port)));
       for (const c of containers) {
@@ -85,7 +89,12 @@ export function registerNetworkModule(deps: GatewayDeps): void {
 
           if (!dnsOk) flags.push('missing_dns');
           if (!ingress) flags.push('missing_tunnel_ingress');
-          if (ingress && !npmHost && !ingress.service.startsWith('ssh://') && !ingress.service.includes('homemcp')) {
+          if (
+            ingress &&
+            !npmHost &&
+            !ingress.service.startsWith('ssh://') &&
+            !ingress.service.includes('homemcp')
+          ) {
             flags.push('ingress_without_npm_host');
           }
 
@@ -103,14 +112,21 @@ export function registerNetworkModule(deps: GatewayDeps): void {
                 flags.push('cert_expiring_soon');
               }
             }
-            if (!listeningPorts.has(npmHost.forward_port) && !npmHost.forward_host.match(/^[a-z]/i)) {
+            if (
+              !listeningPorts.has(npmHost.forward_port) &&
+              !npmHost.forward_host.match(/^[a-z]/i)
+            ) {
               flags.push('no_local_listener_on_upstream_port');
             }
           }
 
           if (probe && !ingress?.service.startsWith('ssh://')) {
             const pRes = await deps.httpProbe.probe(`https://${hostname}/`, { timeoutMs: 5_000 });
-            probeOk = pRes.ok || pRes.status_code === 302 || pRes.status_code === 401 || pRes.status_code === 403;
+            probeOk =
+              pRes.ok ||
+              pRes.status_code === 302 ||
+              pRes.status_code === 401 ||
+              pRes.status_code === 403;
             probeStatus = pRes.status_code ?? null;
             if (!probeOk) {
               flags.push('probe_failed');
@@ -133,7 +149,9 @@ export function registerNetworkModule(deps: GatewayDeps): void {
       );
 
       const deadCount = routes.filter(
-        (r) => r.flags.includes('probe_failed') || r.flags.includes('no_local_listener_on_upstream_port'),
+        (r) =>
+          r.flags.includes('probe_failed') ||
+          r.flags.includes('no_local_listener_on_upstream_port'),
       ).length;
 
       return {
@@ -163,10 +181,17 @@ export function registerNetworkModule(deps: GatewayDeps): void {
     }),
     handler: async () => {
       const [tunnelCfg, accessApps, secAudit] = await Promise.all([
-        deps.cloudflare ? deps.cloudflare.getTunnelConfig().catch(() => null) : Promise.resolve(null),
+        deps.cloudflare
+          ? deps.cloudflare.getTunnelConfig().catch(() => null)
+          : Promise.resolve(null),
         deps.cloudflare ? deps.cloudflare.listAccessApps().catch(() => []) : Promise.resolve([]),
         deps.agent.call<{
-          listening_sockets: Array<{ proto: string; address: string; port: string; wildcard: boolean }>;
+          listening_sockets: Array<{
+            proto: string;
+            address: string;
+            port: string;
+            wildcard: boolean;
+          }>;
         }>('system.security_audit'),
       ]);
 
@@ -358,12 +383,18 @@ export function registerNetworkModule(deps: GatewayDeps): void {
     outputSchema: z.record(z.string(), z.unknown()),
     handler: (args, ctx) => {
       if (!deps.npm || !deps.cloudflare) {
-        throw new HomemcpError('UPSTREAM_UNAVAILABLE', 'NPM or Cloudflare connector not configured');
+        throw new HomemcpError(
+          'UPSTREAM_UNAVAILABLE',
+          'NPM or Cloudflare connector not configured',
+        );
       }
       const zones = deps.config.modules.network?.cloudflare?.zones ?? [];
       const zoneName = zones.find((z) => args.hostname === z || args.hostname.endsWith(`.${z}`));
       if (!zoneName) {
-        throw new HomemcpError('INVALID_ARGUMENT', `Hostname ${args.hostname} does not match any configured Cloudflare zone`);
+        throw new HomemcpError(
+          'INVALID_ARGUMENT',
+          `Hostname ${args.hostname} does not match any configured Cloudflare zone`,
+        );
       }
 
       const plan = deps.plans.createPlan({
@@ -385,7 +416,9 @@ export function registerNetworkModule(deps: GatewayDeps): void {
             ? `Protected by Cloudflare Access (${args.access_emails.join(', ')})`
             : 'Publicly reachable without Cloudflare Access OTP',
         ],
-        rollback: ['Saga auto-reverses completed steps on any failure; unexpose_plan removes all created records'],
+        rollback: [
+          'Saga auto-reverses completed steps on any failure; unexpose_plan removes all created records',
+        ],
         createdBy: ctx.auth.subject,
       });
       const chal = deps.confirmations.createChallenge(plan.id, 'url');
@@ -422,7 +455,10 @@ export function registerNetworkModule(deps: GatewayDeps): void {
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!deps.npm || !deps.cloudflare) {
-        throw new HomemcpError('UPSTREAM_UNAVAILABLE', 'NPM or Cloudflare connector not configured');
+        throw new HomemcpError(
+          'UPSTREAM_UNAVAILABLE',
+          'NPM or Cloudflare connector not configured',
+        );
       }
       const gate = await deps.confirmations.requireApprovalOrChallenge({
         planId: args.plan_id,
@@ -455,7 +491,8 @@ export function registerNetworkModule(deps: GatewayDeps): void {
         scheme: 'http' | 'https';
         access_emails: string[];
       };
-      const originSvc = deps.config.modules.network?.cloudflare?.originService ?? 'http://192.0.2.10';
+      const originSvc =
+        deps.config.modules.network?.cloudflare?.originService ?? 'http://192.0.2.10';
 
       let createdNpmId: number | undefined;
       let prevIngress: CloudflareTunnelConfig['config'] | undefined;
@@ -486,7 +523,9 @@ export function registerNetworkModule(deps: GatewayDeps): void {
           run: async () => {
             const res = await deps.cloudflare!.updateTunnelIngress((cfg) => {
               const filtered = cfg.ingress.filter((r) => r.hostname !== p.hostname);
-              const catchAllIdx = filtered.findIndex((r) => !r.hostname && r.service === 'http_status:404');
+              const catchAllIdx = filtered.findIndex(
+                (r) => !r.hostname && r.service === 'http_status:404',
+              );
               const insertAt = catchAllIdx >= 0 ? catchAllIdx : filtered.length;
               filtered.splice(insertAt, 0, {
                 hostname: p.hostname,
@@ -589,7 +628,8 @@ export function registerNetworkModule(deps: GatewayDeps): void {
     name: 'unexpose_plan',
     toolset: 'network',
     tier: 'T0',
-    description: 'Plans removing public Access, DNS CNAME, tunnel ingress, and NPM proxy host for a hostname. Read-only.',
+    description:
+      'Plans removing public Access, DNS CNAME, tunnel ingress, and NPM proxy host for a hostname. Read-only.',
     annotations: {
       title: 'Plan Service Unexposure',
       readOnlyHint: true,
@@ -601,7 +641,10 @@ export function registerNetworkModule(deps: GatewayDeps): void {
     outputSchema: z.record(z.string(), z.unknown()),
     handler: (args, ctx) => {
       if (args.hostname.startsWith('ssh.') || args.hostname.startsWith('homemcp.')) {
-        throw new HomemcpError('POLICY_DENIED', `Refusing to unexpose protected hostname ${args.hostname}`);
+        throw new HomemcpError(
+          'POLICY_DENIED',
+          `Refusing to unexpose protected hostname ${args.hostname}`,
+        );
       }
       const plan = deps.plans.createPlan({
         tool: 'unexpose_apply',
@@ -644,7 +687,10 @@ export function registerNetworkModule(deps: GatewayDeps): void {
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!deps.npm || !deps.cloudflare) {
-        throw new HomemcpError('UPSTREAM_UNAVAILABLE', 'NPM or Cloudflare connector not configured');
+        throw new HomemcpError(
+          'UPSTREAM_UNAVAILABLE',
+          'NPM or Cloudflare connector not configured',
+        );
       }
       const gate = await deps.confirmations.requireApprovalOrChallenge({
         planId: args.plan_id,
@@ -832,7 +878,9 @@ export function registerNetworkModule(deps: GatewayDeps): void {
       idempotentHint: false,
       openWorldHint: false,
     },
-    inputSchema: z.object({ id: z.number().int().positive(), plan_id: z.string().optional() }).strict(),
+    inputSchema: z
+      .object({ id: z.number().int().positive(), plan_id: z.string().optional() })
+      .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!deps.npm) {
@@ -911,7 +959,9 @@ export function registerNetworkModule(deps: GatewayDeps): void {
       idempotentHint: false,
       openWorldHint: true,
     },
-    inputSchema: z.object({ history_id: z.string().optional(), plan_id: z.string().optional() }).strict(),
+    inputSchema: z
+      .object({ history_id: z.string().optional(), plan_id: z.string().optional() })
+      .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!deps.cloudflare) {
@@ -919,12 +969,12 @@ export function registerNetworkModule(deps: GatewayDeps): void {
       }
       if (!args.plan_id) {
         const row = args.history_id
-          ? (deps.db.db.prepare('SELECT * FROM cf_ingress_history WHERE id = ?').get(args.history_id) as
-              | Record<string, unknown>
-              | undefined)
-          : (deps.db.db.prepare('SELECT * FROM cf_ingress_history ORDER BY ts DESC LIMIT 1').get() as
-              | Record<string, unknown>
-              | undefined);
+          ? (deps.db.db
+              .prepare('SELECT * FROM cf_ingress_history WHERE id = ?')
+              .get(args.history_id) as Record<string, unknown> | undefined)
+          : (deps.db.db
+              .prepare('SELECT * FROM cf_ingress_history ORDER BY ts DESC LIMIT 1')
+              .get() as Record<string, unknown> | undefined);
         if (!row) {
           throw new HomemcpError('NOT_FOUND', 'No cf_ingress_history snapshot found');
         }
@@ -976,9 +1026,9 @@ export function registerNetworkModule(deps: GatewayDeps): void {
         };
       }
       const { history_id } = gate.plan.payload as { history_id: string };
-      const row = deps.db.db.prepare('SELECT * FROM cf_ingress_history WHERE id = ?').get(history_id) as
-        | { config_json: string }
-        | undefined;
+      const row = deps.db.db
+        .prepare('SELECT * FROM cf_ingress_history WHERE id = ?')
+        .get(history_id) as { config_json: string } | undefined;
       if (!row) {
         throw new HomemcpError('NOT_FOUND', `Snapshot ${history_id} not found`);
       }

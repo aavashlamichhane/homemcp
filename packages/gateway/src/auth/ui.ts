@@ -1,8 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import type {
-  AuthenticationResponseJSON,
-  RegistrationResponseJSON,
-} from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import express, { type Express, type Request, type Response } from 'express';
 import type Provider from 'oidc-provider';
 import { ALL_SCOPES, type HomemcpConfig, type Scope } from '@homemcp/core';
@@ -144,7 +141,7 @@ export function registerAuthUiRoutes(
       res.locals['cspNonce'] = nonce;
       res.setHeader(
         'Content-Security-Policy',
-        `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'`,
+        `default-src 'none'; connect-src 'self'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'`,
       );
       res.setHeader('X-Frame-Options', 'DENY');
       res.setHeader('Referrer-Policy', 'no-referrer');
@@ -156,9 +153,10 @@ export function registerAuthUiRoutes(
     const csrf = randomBytes(16).toString('hex');
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const val = signSessionCookie({ sub: 'owner', authTime, csrf, exp }, config.auth.secretKey);
+    const secureAttr = config.server.publicUrl.startsWith('https://') ? '; Secure' : '';
     res.setHeader(
       'Set-Cookie',
-      `homemcp_sess=${encodeURIComponent(val)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`,
+      `homemcp_sess=${encodeURIComponent(val)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600${secureAttr}`,
     );
     return csrf;
   };
@@ -171,7 +169,9 @@ export function registerAuthUiRoutes(
     const token = typeof req.query['token'] === 'string' ? req.query['token'] : '';
     const nonce = String(res.locals['cspNonce'] ?? '');
     if (!token) {
-      res.status(400).send(renderLayout('Bootstrap', '<p class="err">Missing bootstrap token.</p>', nonce));
+      res
+        .status(400)
+        .send(renderLayout('Bootstrap', '<p class="err">Missing bootstrap token.</p>', nonce));
       return;
     }
     const html = renderLayout(
@@ -299,9 +299,25 @@ export function registerAuthUiRoutes(
         return;
       }
 
-      res.status(400).send(renderLayout('Interaction', `<p>Unsupported prompt: ${escapeHtml(prompt.name)}</p>`, nonce));
+      res
+        .status(400)
+        .send(
+          renderLayout(
+            'Interaction',
+            `<p>Unsupported prompt: ${escapeHtml(prompt.name)}</p>`,
+            nonce,
+          ),
+        );
     } catch (err) {
-      res.status(400).send(renderLayout('Error', `<p class="err">${escapeHtml(err instanceof Error ? err.message : 'Interaction error')}</p>`, nonce));
+      res
+        .status(400)
+        .send(
+          renderLayout(
+            'Error',
+            `<p class="err">${escapeHtml(err instanceof Error ? err.message : 'Interaction error')}</p>`,
+            nonce,
+          ),
+        );
     }
   });
 
@@ -389,7 +405,8 @@ export function registerAuthUiRoutes(
           return;
         }
 
-        const reqScopeStr = typeof details.params['scope'] === 'string' ? details.params['scope'] : '';
+        const reqScopeStr =
+          typeof details.params['scope'] === 'string' ? details.params['scope'] : '';
         const requestedTokens = reqScopeStr.split(/\s+/).filter(Boolean);
         const oidcScopes = requestedTokens.filter((s) => s === 'openid' || s === 'offline_access');
         if (oidcScopes.length > 0) {
@@ -523,12 +540,28 @@ export function registerAuthUiRoutes(
     const nonce = String(res.locals['cspNonce'] ?? '');
     const sess = getSession(req);
     if (!sess) {
-      res.status(401).send(renderLayout('Auth Required', '<p>Sign in at <a class="btn" href="/account">/account</a> first.</p>', nonce));
+      res
+        .status(401)
+        .send(
+          renderLayout(
+            'Auth Required',
+            '<p>Sign in at <a class="btn" href="/account">/account</a> first.</p>',
+            nonce,
+          ),
+        );
       return;
     }
     const token = pats.consumeOneTimeReveal(String(req.params['id']));
     if (!token) {
-      res.status(404).send(renderLayout('Expired', '<p class="err">PAT reveal link expired or already viewed.</p>', nonce));
+      res
+        .status(404)
+        .send(
+          renderLayout(
+            'Expired',
+            '<p class="err">PAT reveal link expired or already viewed.</p>',
+            nonce,
+          ),
+        );
       return;
     }
     res.type('html').send(
@@ -546,31 +579,32 @@ export function registerAuthUiRoutes(
   app.get('/confirm/:id', (req, res) => {
     const nonce = String(res.locals['cspNonce'] ?? '');
     if (!confirmations || !plans) {
-      res.status(404).send(renderLayout('Unavailable', '<p class="err">Confirmation gate disabled.</p>', nonce));
+      res
+        .status(404)
+        .send(renderLayout('Unavailable', '<p class="err">Confirmation gate disabled.</p>', nonce));
       return;
     }
     const conf = confirmations.getConfirmation(String(req.params['id']));
     if (!conf) {
-      res.status(404).send(renderLayout('Not Found', '<p class="err">Confirmation not found.</p>', nonce));
+      res
+        .status(404)
+        .send(renderLayout('Not Found', '<p class="err">Confirmation not found.</p>', nonce));
       return;
     }
     const plan = plans.getPlan(conf.plan_id);
     if (!plan) {
-      res.status(404).send(renderLayout('Not Found', '<p class="err">Associated plan not found.</p>', nonce));
+      res
+        .status(404)
+        .send(renderLayout('Not Found', '<p class="err">Associated plan not found.</p>', nonce));
       return;
     }
     const sess = getSession(req);
     const csrf = sess?.csrf ?? randomBytes(16).toString('hex');
-    const isFreshPasskey =
-      sess !== null && Math.floor(Date.now() / 1000) - sess.authTime <= 300;
+    const isFreshPasskey = sess !== null && Math.floor(Date.now() / 1000) - sess.authTime <= 300;
     const needsPasskey = plan.tier === 'T3' && !isFreshPasskey;
 
-    const sideEffectsHtml = plan.side_effects
-      .map((s) => `<li>${escapeHtml(s)}</li>`)
-      .join('');
-    const rollbackHtml = plan.rollback
-      .map((s) => `<li>${escapeHtml(s)}</li>`)
-      .join('');
+    const sideEffectsHtml = plan.side_effects.map((s) => `<li>${escapeHtml(s)}</li>`).join('');
+    const rollbackHtml = plan.rollback.map((s) => `<li>${escapeHtml(s)}</li>`).join('');
 
     const html = renderLayout(
       `Confirm ${plan.tier} Action`,
@@ -642,7 +676,10 @@ export function registerAuthUiRoutes(
         res.status(400).json({ error: 'Missing assertion' });
         return;
       }
-      const verified = await authService.finishPasskeyAuthentication(`confirm:${id}`, body.response);
+      const verified = await authService.finishPasskeyAuthentication(
+        `confirm:${id}`,
+        body.response,
+      );
       setSession(res, verified.authTime);
       confirmations.approveConfirmation(id, {
         approvedBy: config.auth.owner.name,

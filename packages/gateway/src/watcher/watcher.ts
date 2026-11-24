@@ -47,15 +47,55 @@ interface DefaultRuleSeed {
 }
 
 const DEFAULT_RULES: readonly DefaultRuleSeed[] = [
-  { rule: 'power_on_battery', severity: 'critical', threshold: { max_seconds_offline: 60 }, pending_seconds: 60 },
-  { rule: 'disk_space', severity: 'warning', threshold: { max_use_percent: 85 }, pending_seconds: 0 },
-  { rule: 'smart_health', severity: 'critical', threshold: { require_passed: true }, pending_seconds: 0 },
+  {
+    rule: 'power_on_battery',
+    severity: 'critical',
+    threshold: { max_seconds_offline: 60 },
+    pending_seconds: 60,
+  },
+  {
+    rule: 'disk_space',
+    severity: 'warning',
+    threshold: { max_use_percent: 85 },
+    pending_seconds: 0,
+  },
+  {
+    rule: 'smart_health',
+    severity: 'critical',
+    threshold: { require_passed: true },
+    pending_seconds: 0,
+  },
   { rule: 'temperature', severity: 'warning', threshold: { max_temp_c: 85 }, pending_seconds: 300 },
-  { rule: 'container_unhealthy', severity: 'warning', threshold: { allow_unhealthy: false }, pending_seconds: 180 },
-  { rule: 'backup_stale', severity: 'warning', threshold: { enforce_rpo: true }, pending_seconds: 0 },
-  { rule: 'backup_budget', severity: 'warning', threshold: { budget_bytes: 7_000_000_000 }, pending_seconds: 0 },
-  { rule: 'tunnel_connectors', severity: 'warning', threshold: { min_connections: 3 }, pending_seconds: 60 },
-  { rule: 'security_updates', severity: 'info', threshold: { max_security_count: 25 }, pending_seconds: 0 },
+  {
+    rule: 'container_unhealthy',
+    severity: 'warning',
+    threshold: { allow_unhealthy: false },
+    pending_seconds: 180,
+  },
+  {
+    rule: 'backup_stale',
+    severity: 'warning',
+    threshold: { enforce_rpo: true },
+    pending_seconds: 0,
+  },
+  {
+    rule: 'backup_budget',
+    severity: 'warning',
+    threshold: { budget_bytes: 7_000_000_000 },
+    pending_seconds: 0,
+  },
+  {
+    rule: 'tunnel_connectors',
+    severity: 'warning',
+    threshold: { min_connections: 3 },
+    pending_seconds: 60,
+  },
+  {
+    rule: 'security_updates',
+    severity: 'info',
+    threshold: { max_security_count: 25 },
+    pending_seconds: 0,
+  },
 ];
 
 export class AlertWatcher {
@@ -97,7 +137,10 @@ export class AlertWatcher {
       rule: String(r['rule']),
       severity: String(r['severity']) as AlertSeverity,
       enabled: Number(r['enabled'] ?? 1) === 1,
-      threshold: JSON.parse(String(r['threshold_json'])) as Record<string, number | string | boolean>,
+      threshold: JSON.parse(String(r['threshold_json'])) as Record<
+        string,
+        number | string | boolean
+      >,
       pending_seconds: Number(r['pending_seconds'] ?? 0),
       channel: typeof r['channel'] === 'string' ? r['channel'] : 'ntfy',
       updated_at: String(r['updated_at']),
@@ -241,13 +284,17 @@ export class AlertWatcher {
   public async flushOutboundQueue(): Promise<number> {
     if (!this.deps.ntfy) return 0;
     const pending = this.deps.db.db
-      .prepare('SELECT * FROM outbound_notifications WHERE sent_at IS NULL ORDER BY created_at ASC LIMIT 50')
+      .prepare(
+        'SELECT * FROM outbound_notifications WHERE sent_at IS NULL ORDER BY created_at ASC LIMIT 50',
+      )
       .all() as Array<Record<string, unknown>>;
     if (pending.length === 0) return 0;
 
     let sentCount = 0;
     const outageSec =
-      this.offlineSinceMs !== undefined ? Math.max(1, Math.round((Date.now() - this.offlineSinceMs) / 1000)) : undefined;
+      this.offlineSinceMs !== undefined
+        ? Math.max(1, Math.round((Date.now() - this.offlineSinceMs) / 1000))
+        : undefined;
 
     for (const row of pending) {
       const id = String(row['id']);
@@ -260,10 +307,14 @@ export class AlertWatcher {
         title: String(row['title']),
         message: `${baseMsg}${suffix}`,
         priority: Number(row['priority'] ?? 3) as NtfyPriority,
-        tags: JSON.parse(typeof row['tags_json'] === 'string' ? row['tags_json'] : '[]') as string[],
+        tags: JSON.parse(
+          typeof row['tags_json'] === 'string' ? row['tags_json'] : '[]',
+        ) as string[],
       });
       this.deps.db.db
-        .prepare('UPDATE outbound_notifications SET sent_at = ?, attempts = attempts + 1 WHERE id = ?')
+        .prepare(
+          'UPDATE outbound_notifications SET sent_at = ?, attempts = attempts + 1 WHERE id = ?',
+        )
         .run(new Date().toISOString(), id);
       sentCount++;
     }
@@ -292,26 +343,33 @@ export class AlertWatcher {
           smart_summary: Array<{ device: string; passed: boolean }>;
         }>('system.disks')
         .catch(() => null),
-      this.deps.agent
-        .call<{ security_count: number }>('system.updates')
-        .catch(() => null),
+      this.deps.agent.call<{ security_count: number }>('system.updates').catch(() => null),
       this.deps.agent
         .call<{
           status: Record<string, { last_status?: string; last_success?: string }>;
           stats: { total_size?: number };
         }>('backup.read_status')
         .catch(() => null),
-      this.deps.docker ? this.deps.docker.listContainers(true).catch(() => []) : Promise.resolve([]),
-      this.deps.cloudflare ? this.deps.cloudflare.getTunnelStatus().catch(() => null) : Promise.resolve(null),
+      this.deps.docker
+        ? this.deps.docker.listContainers(true).catch(() => [])
+        : Promise.resolve([]),
+      this.deps.cloudflare
+        ? this.deps.cloudflare.getTunnelStatus().catch(() => null)
+        : Promise.resolve(null),
     ]);
 
     const rules = this.listRules();
-    const findings = new Map<string, { breached: boolean; summary: string; payload: Record<string, unknown> }>();
+    const findings = new Map<
+      string,
+      { breached: boolean; summary: string; payload: Record<string, unknown> }
+    >();
 
     const maxTemp = health?.temperatures.length
       ? Math.max(...health.temperatures.map((t) => t.temp_c))
       : 0;
-    const tempLimit = Number(rules.find((r) => r.rule === 'temperature')?.threshold['max_temp_c'] ?? 85);
+    const tempLimit = Number(
+      rules.find((r) => r.rule === 'temperature')?.threshold['max_temp_c'] ?? 85,
+    );
     findings.set('temperature', {
       breached: maxTemp > tempLimit,
       summary: `CPU package temperature ${maxTemp}°C (> ${tempLimit}°C)`,
@@ -328,7 +386,9 @@ export class AlertWatcher {
     const maxUse = disks?.filesystems.length
       ? Math.max(...disks.filesystems.map((d) => d.use_percent))
       : 0;
-    const diskLimit = Number(rules.find((r) => r.rule === 'disk_space')?.threshold['max_use_percent'] ?? 85);
+    const diskLimit = Number(
+      rules.find((r) => r.rule === 'disk_space')?.threshold['max_use_percent'] ?? 85,
+    );
     findings.set('disk_space', {
       breached: maxUse >= diskLimit,
       summary: `Disk usage at ${maxUse}% (>= ${diskLimit}%)`,
@@ -356,7 +416,9 @@ export class AlertWatcher {
     if (backupData) {
       for (const [setName, cfg] of Object.entries(configuredSets)) {
         const st = backupData.status[setName];
-        const ageSec = st?.last_success ? Math.floor((nowMs - Date.parse(st.last_success)) / 1000) : Infinity;
+        const ageSec = st?.last_success
+          ? Math.floor((nowMs - Date.parse(st.last_success)) / 1000)
+          : Infinity;
         const rpoSec = Math.floor(parseDurationMs(cfg.rpo) / 1000);
         if (st?.last_status !== 'success' || ageSec > rpoSec) {
           staleSets.push(setName);
@@ -382,7 +444,9 @@ export class AlertWatcher {
     });
 
     if (tunnelStatus) {
-      const minConn = Number(rules.find((r) => r.rule === 'tunnel_connectors')?.threshold['min_connections'] ?? 3);
+      const minConn = Number(
+        rules.find((r) => r.rule === 'tunnel_connectors')?.threshold['min_connections'] ?? 3,
+      );
       findings.set('tunnel_connectors', {
         breached: tunnelStatus.connections.length < minConn,
         summary: `Cloudflare tunnel connections ${tunnelStatus.connections.length} (< ${minConn})`,
@@ -391,7 +455,9 @@ export class AlertWatcher {
     }
 
     const secCount = updates?.security_count ?? 0;
-    const maxSec = Number(rules.find((r) => r.rule === 'security_updates')?.threshold['max_security_count'] ?? 25);
+    const maxSec = Number(
+      rules.find((r) => r.rule === 'security_updates')?.threshold['max_security_count'] ?? 25,
+    );
     findings.set('security_updates', {
       breached: secCount > maxSec,
       summary: `${secCount} pending security updates (> ${maxSec})`,
@@ -404,14 +470,18 @@ export class AlertWatcher {
     for (const r of rules) {
       const finding = findings.get(r.rule);
       const existing = this.deps.db.db
-        .prepare("SELECT * FROM alerts WHERE rule = ? AND state IN ('pending', 'firing') ORDER BY last_seen DESC LIMIT 1")
+        .prepare(
+          "SELECT * FROM alerts WHERE rule = ? AND state IN ('pending', 'firing') ORDER BY last_seen DESC LIMIT 1",
+        )
         .get(r.rule) as Record<string, unknown> | undefined;
 
       if (!r.enabled || !finding || !finding.breached) {
         if (existing) {
           const prevState = String(existing['state']);
           this.deps.db.db
-            .prepare("UPDATE alerts SET state = 'resolved', resolved_at = ?, last_seen = ? WHERE id = ?")
+            .prepare(
+              "UPDATE alerts SET state = 'resolved', resolved_at = ?, last_seen = ? WHERE id = ?",
+            )
             .run(nowIso, nowIso, String(existing['id']));
           if (prevState === 'firing') {
             resolvedCount++;
@@ -457,8 +527,11 @@ export class AlertWatcher {
       } else {
         const id = String(existing['id']);
         const prevState = String(existing['state']) as AlertState;
-        const pendingSinceMs = Date.parse(String(existing['pending_since'] ?? existing['first_seen']));
-        const snoozedUntil = typeof existing['snoozed_until'] === 'string' ? Date.parse(existing['snoozed_until']) : 0;
+        const pendingSinceMs = Date.parse(
+          String(existing['pending_since'] ?? existing['first_seen']),
+        );
+        const snoozedUntil =
+          typeof existing['snoozed_until'] === 'string' ? Date.parse(existing['snoozed_until']) : 0;
         const isAcked = Boolean(existing['acked_at']);
         const isSnoozed = snoozedUntil > nowMs;
 
@@ -470,7 +543,9 @@ export class AlertWatcher {
         }
 
         this.deps.db.db
-          .prepare('UPDATE alerts SET state = ?, last_seen = ?, summary = ?, payload_json = ? WHERE id = ?')
+          .prepare(
+            'UPDATE alerts SET state = ?, last_seen = ?, summary = ?, payload_json = ? WHERE id = ?',
+          )
           .run(nextState, nowIso, finding.summary, JSON.stringify(finding.payload), id);
 
         if (transitionedToFiring && !isAcked && !isSnoozed) {

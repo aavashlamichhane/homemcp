@@ -81,7 +81,10 @@ export function registerSystemModule(deps: GatewayDeps): void {
     inputSchema: z
       .object({
         group: z.enum(['cpu', 'mem', 'io', 'net', 'load']).default('cpu'),
-        day: z.string().regex(/^\d{2}$/).optional(),
+        day: z
+          .string()
+          .regex(/^\d{2}$/)
+          .optional(),
         max_points: z.number().int().min(10).max(120).default(120),
       })
       .strict(),
@@ -157,7 +160,10 @@ export function registerSystemModule(deps: GatewayDeps): void {
 
       return {
         summary: filesystems
-          .map((f) => `${f.mountpoint}: ${f.use_percent}% used (${Math.round(f.available_bytes / 1e9)} GB free)`)
+          .map(
+            (f) =>
+              `${f.mountpoint}: ${f.use_percent}% used (${Math.round(f.available_bytes / 1e9)} GB free)`,
+          )
           .join('\n'),
         structured: { filesystems, smart_summary: data.smart_summary },
       };
@@ -180,7 +186,9 @@ export function registerSystemModule(deps: GatewayDeps): void {
     inputSchema: z.object({ device: z.string().regex(/^[a-z0-9_-]+$/) }).strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async ({ device }) => {
-      const data = await deps.agent.call<Record<string, unknown>>('system.smart_details', { device });
+      const data = await deps.agent.call<Record<string, unknown>>('system.smart_details', {
+        device,
+      });
       return {
         summary: `SMART ${device} (${String(data['model'])}): passed=${String(data['passed'])}`,
         structured: data,
@@ -514,7 +522,9 @@ export function registerSystemModule(deps: GatewayDeps): void {
       idempotentHint: false,
       openWorldHint: false,
     },
-    inputSchema: z.object({ plan_id: z.string().optional(), reason: z.string().default('kernel updates') }).strict(),
+    inputSchema: z
+      .object({ plan_id: z.string().optional(), reason: z.string().default('kernel updates') })
+      .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!args.plan_id) {
@@ -565,7 +575,10 @@ export function registerSystemModule(deps: GatewayDeps): void {
           confirmationId: gate.confirmationId,
         };
       }
-      const res = await deps.agent.call<{ scheduled: boolean; message: string }>('system.reboot', {});
+      const res = await deps.agent.call<{ scheduled: boolean; message: string }>(
+        'system.reboot',
+        {},
+      );
       deps.plans.markApplied(gate.plan.id);
       await deps.watcher.sendOrQueueNotification({
         title: 'Host Reboot Scheduled',

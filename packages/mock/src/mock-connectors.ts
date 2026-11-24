@@ -71,7 +71,9 @@ export class MockDockerConnector implements DockerConnector {
       this.state.containers.map((c) => ({
         Id: c.ImageID,
         RepoTags: [c.Image],
-        RepoDigests: [`${c.Image.split(':')[0]}@sha256:${c.ImageID.replace('sha256:', '').padEnd(64, '0')}`],
+        RepoDigests: [
+          `${c.Image.split(':')[0]}@sha256:${c.ImageID.replace('sha256:', '').padEnd(64, '0')}`,
+        ],
         Size: 150_000_000,
       })),
     );
@@ -79,7 +81,12 @@ export class MockDockerConnector implements DockerConnector {
 
   public getEvents() {
     return Promise.resolve([
-      { Type: 'container', Action: 'health_status: healthy', Actor: { Attributes: { name: 'navidrome' } }, time: Math.floor(Date.now() / 1000) - 120 },
+      {
+        Type: 'container',
+        Action: 'health_status: healthy',
+        Actor: { Attributes: { name: 'navidrome' } },
+        time: Math.floor(Date.now() / 1000) - 120,
+      },
     ]);
   }
 
@@ -141,7 +148,10 @@ export class MockNpmConnector implements NpmConnector {
     return Promise.resolve(host);
   }
 
-  public updateProxyHost(id: number, input: Partial<CreateNpmProxyHostInput>): Promise<NpmProxyHost> {
+  public updateProxyHost(
+    id: number,
+    input: Partial<CreateNpmProxyHostInput>,
+  ): Promise<NpmProxyHost> {
     const host = this.state.npmHosts.find((h) => h.id === id);
     if (!host) {
       return Promise.reject(new HomemcpError('NOT_FOUND', `NPM proxy host ${id} not found`));
@@ -197,7 +207,9 @@ export class MockCloudflareConnector implements CloudflareConnector {
   public upsertDnsCname(zoneName: string, hostname: string): Promise<CloudflareDnsRecord> {
     if (this.state.failNextCfDns) {
       this.state.failNextCfDns = false;
-      return Promise.reject(new HomemcpError('UPSTREAM_UNAVAILABLE', 'Simulated Cloudflare DNS failure'));
+      return Promise.reject(
+        new HomemcpError('UPSTREAM_UNAVAILABLE', 'Simulated Cloudflare DNS failure'),
+      );
     }
     const existing = this.state.cfDnsRecords.find((r) => r.name === hostname);
     if (existing) {
@@ -223,7 +235,9 @@ export class MockCloudflareConnector implements CloudflareConnector {
       return Promise.reject(new HomemcpError('NOT_FOUND', `DNS record not found: ${recordId}`));
     }
     if (rec.type !== 'CNAME' || rec.content !== 'tun-mock.cfargotunnel.com') {
-      return Promise.reject(new HomemcpError('POLICY_DENIED', 'DNS record target does not match tunnel'));
+      return Promise.reject(
+        new HomemcpError('POLICY_DENIED', 'DNS record target does not match tunnel'),
+      );
     }
     this.state.cfDnsRecords = this.state.cfDnsRecords.filter((r) => r.id !== recordId);
     return Promise.resolve();
@@ -308,7 +322,11 @@ export class MockSubsonicConnector implements SubsonicConnector {
 
   public search3(
     query: string,
-    opts?: { songCount?: number | undefined; albumCount?: number | undefined; artistCount?: number | undefined },
+    opts?: {
+      songCount?: number | undefined;
+      albumCount?: number | undefined;
+      artistCount?: number | undefined;
+    },
   ) {
     const q = query.trim().toLowerCase();
     const songs = this.state.musicSongs
@@ -362,7 +380,9 @@ export class MockSubsonicConnector implements SubsonicConnector {
   }): Promise<void> {
     const pl = this.state.musicPlaylists.find((p) => p.id === opts.playlistId);
     if (!pl) {
-      return Promise.reject(new HomemcpError('NOT_FOUND', `Playlist not found: ${opts.playlistId}`));
+      return Promise.reject(
+        new HomemcpError('NOT_FOUND', `Playlist not found: ${opts.playlistId}`),
+      );
     }
     if (opts.name !== undefined) pl.name = opts.name;
     if (opts.comment !== undefined) pl.comment = opts.comment;
@@ -398,7 +418,10 @@ export class MockSubsonicConnector implements SubsonicConnector {
   public startScan(): Promise<SubsonicScanStatus> {
     // Promote any newly saved NaviLoad tracks into the Navidrome library
     for (const trk of this.state.naviloadTracks) {
-      if (trk.status === 'saved' && !this.state.musicSongs.some((s) => trk.video_id && s.path?.includes(trk.video_id))) {
+      if (
+        trk.status === 'saved' &&
+        !this.state.musicSongs.some((s) => trk.video_id && s.path?.includes(trk.video_id))
+      ) {
         this.state.musicSongs.push({
           id: `song-${this.state.musicSongs.length + 1}`,
           title: trk.title,
@@ -442,7 +465,12 @@ export class MockSubsonicConnector implements SubsonicConnector {
 
   public getNowPlaying() {
     return Promise.resolve([
-      { id: this.state.musicSongs[0]?.id ?? 'song-1', title: 'Halo', artist: 'Beyoncé', username: 'owner' },
+      {
+        id: this.state.musicSongs[0]?.id ?? 'song-1',
+        title: 'Halo',
+        artist: 'Beyoncé',
+        username: 'owner',
+      },
     ]);
   }
 
@@ -473,7 +501,9 @@ export class MockNaviloadConnector implements NaviloadConnector {
   public constructor(private readonly state: MockState) {}
 
   public health() {
-    const pendingReview = this.state.naviloadTracks.filter((t) => t.status === 'pending_review').length;
+    const pendingReview = this.state.naviloadTracks.filter(
+      (t) => t.status === 'pending_review',
+    ).length;
     const failed = this.state.naviloadTracks.filter((t) => t.status === 'failed').length;
     return Promise.resolve({
       status: 'ok',
@@ -533,7 +563,8 @@ export class MockNaviloadConnector implements NaviloadConnector {
     const items: Array<Record<string, unknown>> = [];
     for (const url of opts.urls) {
       const match = /[?&]v=([A-Za-z0-9_-]{11})/.exec(url);
-      const videoId = match?.[1] ?? `vid${this.state.naviloadTracks.length + 1}`.padEnd(11, '0').slice(0, 11);
+      const videoId =
+        match?.[1] ?? `vid${this.state.naviloadTracks.length + 1}`.padEnd(11, '0').slice(0, 11);
       const id = `trk-${this.state.naviloadTracks.length + 1}`;
       const cand = Object.values(this.state.naviloadCandidates)
         .flat()
@@ -569,7 +600,9 @@ export class MockNaviloadConnector implements NaviloadConnector {
   public getStatus() {
     return Promise.resolve({
       tracks: this.state.naviloadTracks.map((t) => ({ ...t })),
-      queue_depth: this.state.naviloadTracks.filter((t) => t.status !== 'saved' && t.status !== 'cancelled').length,
+      queue_depth: this.state.naviloadTracks.filter(
+        (t) => t.status !== 'saved' && t.status !== 'cancelled',
+      ).length,
     });
   }
 
@@ -598,7 +631,9 @@ export class MockNaviloadConnector implements NaviloadConnector {
     if (opts.policy === 'suggestion') {
       const sug = trk.suggestions?.[opts.suggestionIndex ?? 0];
       if (!sug) {
-        return Promise.reject(new HomemcpError('INVALID_ARGUMENT', 'Requested suggestion index not found'));
+        return Promise.reject(
+          new HomemcpError('INVALID_ARGUMENT', 'Requested suggestion index not found'),
+        );
       }
       if (typeof sug['title'] === 'string') trk.title = sug['title'];
       if (typeof sug['artist'] === 'string') trk.artist = sug['artist'];
@@ -609,7 +644,11 @@ export class MockNaviloadConnector implements NaviloadConnector {
       if (opts.manualTags.album) trk.album = opts.manualTags.album;
     }
     trk.status = 'reviewed';
-    return Promise.resolve({ ok: true, track: { ...trk }, artwork_policy: opts.artworkPolicy ?? 'db_then_youtube' });
+    return Promise.resolve({
+      ok: true,
+      track: { ...trk },
+      artwork_policy: opts.artworkPolicy ?? 'db_then_youtube',
+    });
   }
 
   public confirmTrack(trackId: string) {
@@ -677,7 +716,8 @@ export class MockJellyfinConnector implements JellyfinConnector {
     const q = (opts.searchTerm ?? '').toLowerCase();
     const filtered = this.state.jellyfinItems.filter((item) => {
       if (q && !item.Name.toLowerCase().includes(q)) return false;
-      if (opts.includeItemTypes && !opts.includeItemTypes.split(',').includes(item.Type)) return false;
+      if (opts.includeItemTypes && !opts.includeItemTypes.split(',').includes(item.Type))
+        return false;
       return true;
     });
     return Promise.resolve({
@@ -735,12 +775,16 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
     return Promise.resolve([...list]);
   }
 
-  public addTorrent(opts: { urls: readonly string[]; category?: string | undefined; savepath?: string | undefined }) {
+  public addTorrent(opts: {
+    urls: readonly string[];
+    category?: string | undefined;
+    savepath?: string | undefined;
+  }) {
     for (const url of opts.urls) {
       const hash = `mock${(this.state.qbitTorrents.length + 1).toString(16).padStart(36, '0')}`;
       this.state.qbitTorrents.push({
         hash,
-        name: url.startsWith('magnet:') ? 'Magnet Download' : url.split('/').pop() ?? 'Download',
+        name: url.startsWith('magnet:') ? 'Magnet Download' : (url.split('/').pop() ?? 'Download'),
         size: 1_500_000_000,
         progress: 0,
         dlspeed: 0,
@@ -758,7 +802,8 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
   public controlTorrents(action: 'pause' | 'resume' | 'recheck', hashes: readonly string[]) {
     for (const t of this.state.qbitTorrents) {
       if (hashes.includes(t.hash)) {
-        t.state = action === 'pause' ? 'pausedDL' : action === 'resume' ? 'downloading' : 'checkingDL';
+        t.state =
+          action === 'pause' ? 'pausedDL' : action === 'resume' ? 'downloading' : 'checkingDL';
       }
     }
     return Promise.resolve();
@@ -775,7 +820,9 @@ export class MockNtfyConnector implements NtfyConnector {
 
   public send(msg: NtfyMessage): Promise<void> {
     if (!this.state.ntfyOnline) {
-      return Promise.reject(new HomemcpError('UPSTREAM_UNAVAILABLE', 'ntfy offline (simulated outage)'));
+      return Promise.reject(
+        new HomemcpError('UPSTREAM_UNAVAILABLE', 'ntfy offline (simulated outage)'),
+      );
     }
     this.state.ntfySent.push(msg);
     return Promise.resolve();

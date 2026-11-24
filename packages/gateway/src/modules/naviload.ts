@@ -18,7 +18,8 @@ export function registerNaviloadModule(deps: GatewayDeps): void {
     name: 'naviload_health',
     toolset: 'naviload',
     tier: 'T0',
-    description: 'Returns NaviLoad /healthz, queue depth, pending review count, and failed track count. Read-only.',
+    description:
+      'Returns NaviLoad /healthz, queue depth, pending review count, and failed track count. Read-only.',
     annotations: {
       title: 'NaviLoad Health',
       readOnlyHint: true,
@@ -180,7 +181,9 @@ export function registerNaviloadModule(deps: GatewayDeps): void {
     handler: async () => {
       const nl = requireNaviload(deps);
       const res = await nl.getStatus();
-      const pending = res.tracks.filter((t) => t.status === 'pending_review');
+      const pending = res.tracks.filter(
+        (t) => t.status === 'pending_review' || t.status === 'review',
+      );
       return {
         summary: `${pending.length} track(s) pending metadata review`,
         structured: { pending: pending as unknown as Array<Record<string, unknown>> },
@@ -232,7 +235,9 @@ export function registerNaviloadModule(deps: GatewayDeps): void {
         try {
           const maybeElicit = (
             ctx.mcpCtx.mcpReq as unknown as {
-              elicitInput?: (p: unknown) => Promise<{ action: string; content?: Record<string, unknown> }>;
+              elicitInput?: (
+                p: unknown,
+              ) => Promise<{ action: string; content?: Record<string, unknown> }>;
             }
           ).elicitInput;
           if (typeof maybeElicit === 'function') {
@@ -247,7 +252,8 @@ export function registerNaviloadModule(deps: GatewayDeps): void {
                 required: ['approve'],
               },
             });
-            confirmedByUser = elicitRes.action === 'accept' && elicitRes.content?.['approve'] === true;
+            confirmedByUser =
+              elicitRes.action === 'accept' && elicitRes.content?.['approve'] === true;
           }
         } catch {
           confirmedByUser = false;
@@ -312,7 +318,7 @@ export function registerNaviloadModule(deps: GatewayDeps): void {
       const nl = requireNaviload(deps);
       const statusBefore = await nl.getStatus();
       const target = statusBefore.tracks.find((t) => t.id === args.track_id);
-      if (target && target.status === 'pending_review') {
+      if (target && (target.status === 'pending_review' || target.status === 'review')) {
         throw new HomemcpError(
           'CONFLICT',
           `Track ${args.track_id} is still pending_review; run naviload_review_decide first`,

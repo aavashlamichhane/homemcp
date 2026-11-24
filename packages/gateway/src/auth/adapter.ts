@@ -38,10 +38,11 @@ export function createSqliteAdapterFactory(db: HomemcpDb): AdapterConstructor {
     public async find(id: string): Promise<AdapterPayload | undefined> {
       const nowSec = Math.floor(Date.now() / 1000);
       const row = db.db
-        .prepare('SELECT payload_json, expires_at, consumed_at FROM oauth_kv WHERE model = ? AND id = ?')
+        .prepare(
+          'SELECT payload_json, expires_at, consumed_at FROM oauth_kv WHERE model = ? AND id = ?',
+        )
         .get(this.model, id) as
-        | { payload_json: string; expires_at: number | null; consumed_at: number | null }
-        | undefined;
+        { payload_json: string; expires_at: number | null; consumed_at: number | null } | undefined;
 
       if (!row) {
         // Dynamic CIMD client resolution per MCP 2026-07-28 spec
@@ -82,10 +83,11 @@ export function createSqliteAdapterFactory(db: HomemcpDb): AdapterConstructor {
     public findByUserCode(userCode: string): Promise<AdapterPayload | undefined> {
       const nowSec = Math.floor(Date.now() / 1000);
       const row = db.db
-        .prepare('SELECT payload_json, expires_at, consumed_at FROM oauth_kv WHERE model = ? AND user_code = ?')
+        .prepare(
+          'SELECT payload_json, expires_at, consumed_at FROM oauth_kv WHERE model = ? AND user_code = ?',
+        )
         .get(this.model, userCode) as
-        | { payload_json: string; expires_at: number | null; consumed_at: number | null }
-        | undefined;
+        { payload_json: string; expires_at: number | null; consumed_at: number | null } | undefined;
       if (!row || (row.expires_at !== null && row.expires_at <= nowSec)) {
         return Promise.resolve(undefined);
       }
@@ -97,10 +99,11 @@ export function createSqliteAdapterFactory(db: HomemcpDb): AdapterConstructor {
     public findByUid(uid: string): Promise<AdapterPayload | undefined> {
       const nowSec = Math.floor(Date.now() / 1000);
       const row = db.db
-        .prepare('SELECT payload_json, expires_at, consumed_at FROM oauth_kv WHERE model = ? AND uid = ?')
+        .prepare(
+          'SELECT payload_json, expires_at, consumed_at FROM oauth_kv WHERE model = ? AND uid = ?',
+        )
         .get(this.model, uid) as
-        | { payload_json: string; expires_at: number | null; consumed_at: number | null }
-        | undefined;
+        { payload_json: string; expires_at: number | null; consumed_at: number | null } | undefined;
       if (!row || (row.expires_at !== null && row.expires_at <= nowSec)) {
         return Promise.resolve(undefined);
       }

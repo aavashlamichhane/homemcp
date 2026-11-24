@@ -193,7 +193,9 @@ describe('Phase 5 Ops: Updates, Auto-Rollback, and Expose/Unexpose Sagas', () =>
       plan_id: rPlanId,
     });
     expect(restApply.structuredContent['applied']).toBe(true);
-    expect(String(restApply.structuredContent['staging_target'])).toContain('/var/lib/homemcp/backup/staging-restore/drill-01');
+    expect(String(restApply.structuredContent['staging_target'])).toContain(
+      '/var/lib/homemcp/backup/staging-restore/drill-01',
+    );
 
     await ct.close();
     await st.close();
@@ -239,7 +241,10 @@ describe('Phase 5 Ops: Updates, Auto-Rollback, and Expose/Unexpose Sagas', () =>
       plan_id: String(failPlan.structuredContent['plan_id']),
     });
     expect(failApply.structuredContent['status']).toBe('rolled_back');
-    expect(failApply.structuredContent['rolled_back_steps']).toEqual(['cf_tunnel_ingress', 'npm_proxy_host']);
+    expect(failApply.structuredContent['rolled_back_steps']).toEqual([
+      'cf_tunnel_ingress',
+      'npm_proxy_host',
+    ]);
     expect(state.npmHosts.length).toBe(initialHostCount);
     expect(state.cfTunnelConfig.config.ingress.length).toBe(initialIngressLen);
 
@@ -263,7 +268,9 @@ describe('Phase 5 Ops: Updates, Auto-Rollback, and Expose/Unexpose Sagas', () =>
     expect(state.cfAccessApps.some((a) => a.domain === 'demo.example.com')).toBe(true);
 
     // Verify cf_ingress_history snapshot recorded
-    const histRows = deps.db.db.prepare('SELECT count(*) AS cnt FROM cf_ingress_history').get() as { cnt: number };
+    const histRows = deps.db.db.prepare('SELECT count(*) AS cnt FROM cf_ingress_history').get() as {
+      cnt: number;
+    };
     expect(histRows.cnt).toBeGreaterThanOrEqual(1);
 
     // Unexpose cleanly

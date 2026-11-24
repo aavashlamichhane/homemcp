@@ -33,7 +33,8 @@ export function registerAlertsModule(deps: GatewayDeps): void {
     name: 'alerts_ack',
     toolset: 'alerts',
     tier: 'T1',
-    description: 'Acknowledges an active alert so repeat notifications are suppressed while investigated.',
+    description:
+      'Acknowledges an active alert so repeat notifications are suppressed while investigated.',
     annotations: {
       title: 'Acknowledge Alert',
       readOnlyHint: false,
@@ -69,7 +70,10 @@ export function registerAlertsModule(deps: GatewayDeps): void {
     inputSchema: z
       .object({
         id: z.string().min(1),
-        duration: z.string().regex(/^\d+[smhd]$/).default('2h'),
+        duration: z
+          .string()
+          .regex(/^\d+[smhd]$/)
+          .default('2h'),
       })
       .strict(),
     outputSchema: z.object({
@@ -88,7 +92,8 @@ export function registerAlertsModule(deps: GatewayDeps): void {
     name: 'alerts_rules_list',
     toolset: 'alerts',
     tier: 'T0',
-    description: 'Lists configured alert rules, severities, thresholds, and pending windows. Read-only.',
+    description:
+      'Lists configured alert rules, severities, thresholds, and pending windows. Read-only.',
     annotations: {
       title: 'List Alert Rules',
       readOnlyHint: true,
@@ -153,7 +158,8 @@ export function registerAlertsModule(deps: GatewayDeps): void {
     name: 'alerts_rule_set',
     toolset: 'alerts',
     tier: 'T2',
-    description: 'Updates an alert rule threshold, severity, pending window, or enabled state (plan-first).',
+    description:
+      'Updates an alert rule threshold, severity, pending window, or enabled state (plan-first).',
     annotations: {
       title: 'Update Alert Rule',
       readOnlyHint: false,
@@ -185,7 +191,11 @@ export function registerAlertsModule(deps: GatewayDeps): void {
             threshold: args.threshold,
           },
           summary: `Update alert rule "${args.rule}"`,
-          diff: JSON.stringify({ severity: args.severity, enabled: args.enabled, threshold: args.threshold }),
+          diff: JSON.stringify({
+            severity: args.severity,
+            enabled: args.enabled,
+            threshold: args.threshold,
+          }),
           sideEffects: [`Alert rule "${args.rule}" configuration changes`],
           rollback: ['Re-run alerts_rule_set with prior values'],
           createdBy: ctx.auth.subject,

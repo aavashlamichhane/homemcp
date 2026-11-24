@@ -247,11 +247,15 @@ export function resolveEnvRefs(
         if (val === undefined || val === '') {
           throw new ConfigError(`Missing required environment variable: ${varName}`);
         }
+        if (/[\r\n]/.test(val)) {
+          throw new ConfigError(
+            `Environment variable ${varName} contains invalid newline characters`,
+          );
+        }
         if (
           redactor &&
           keyHint &&
-          (SECRET_FIELD_NAMES.has(keyHint) ||
-            /(secret|token|password|key|pingUrl)/i.test(keyHint))
+          (SECRET_FIELD_NAMES.has(keyHint) || /(secret|token|password|key|pingUrl)/i.test(keyHint))
         ) {
           redactor.registerSecret(val);
         }
@@ -321,13 +325,6 @@ export function parseDurationMs(expr: string): number {
   }
   const num = Number(m[1]);
   const unit = m[2]!.toLowerCase();
-  const mult =
-    unit === 's'
-      ? 1000
-      : unit === 'm'
-        ? 60_000
-        : unit === 'h'
-          ? 3_600_000
-          : 86_400_000;
+  const mult = unit === 's' ? 1000 : unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000;
   return num * mult;
 }

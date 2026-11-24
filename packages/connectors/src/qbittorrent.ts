@@ -26,7 +26,11 @@ export interface QbitTorrent {
 export interface QbittorrentConnector {
   getTransferInfo(): Promise<QbitTransferInfo>;
   listTorrents(filter?: string): Promise<QbitTorrent[]>;
-  addTorrent(opts: { urls: readonly string[]; category?: string | undefined; savepath?: string | undefined }): Promise<void>;
+  addTorrent(opts: {
+    urls: readonly string[];
+    category?: string | undefined;
+    savepath?: string | undefined;
+  }): Promise<void>;
   controlTorrents(action: 'pause' | 'resume' | 'recheck', hashes: readonly string[]): Promise<void>;
   deleteTorrents(hashes: readonly string[], deleteFiles: boolean): Promise<void>;
 }
@@ -65,7 +69,11 @@ export class HttpQbittorrentConnector implements QbittorrentConnector {
 
   private async withAuth(
     path: string,
-    opts: { method?: string | undefined; headers?: Record<string, string> | undefined; body?: string | undefined } = {},
+    opts: {
+      method?: string | undefined;
+      headers?: Record<string, string> | undefined;
+      body?: string | undefined;
+    } = {},
     retry = true,
   ): Promise<Response> {
     const cookie = this.sidCookie ?? (await this.login());

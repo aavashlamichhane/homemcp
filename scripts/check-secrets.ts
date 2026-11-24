@@ -12,6 +12,7 @@ const REAL_SECRET_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
   { name: 'Slack token', regex: /\bxox[baprs]-[A-Za-z0-9-]{16,}\b/ },
   { name: 'Private key PEM', regex: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
   { name: 'homemcp PAT secret', regex: /\bhmp_[A-Za-z0-9_-]{32,}\b/ },
+  { name: 'Cloudflare API token', regex: /\b(?:cfut|cfat)_[A-Za-z0-9_-]{20,}\b/ },
 ];
 
 // Hash-encoded personal-infrastructure denylist (so no private identifiers exist in source)
@@ -77,10 +78,14 @@ function main(): void {
   }
 
   if (findings.length > 0) {
-    process.stderr.write(`Secret/privacy scan FAILED (${findings.length} finding(s)):\n${findings.join('\n')}\n`);
+    process.stderr.write(
+      `Secret/privacy scan FAILED (${findings.length} finding(s)):\n${findings.join('\n')}\n`,
+    );
     process.exit(1);
   }
-  process.stdout.write(`Secret/privacy scan passed across ${tracked.length} tracked files (0 findings).\n`);
+  process.stdout.write(
+    `Secret/privacy scan passed across ${tracked.length} tracked files (0 findings).\n`,
+  );
 }
 
 main();

@@ -14,28 +14,34 @@ export interface JellyfinSession {
   UserName?: string | undefined;
   Client?: string | undefined;
   DeviceName?: string | undefined;
-  NowPlayingItem?: {
-    Id: string;
-    Name: string;
-    Type: string;
-    RunTimeTicks?: number | undefined;
-  } | undefined;
-  PlayState?: {
-    IsPaused?: boolean | undefined;
-    PositionTicks?: number | undefined;
-    PlayMethod?: string | undefined;
-  } | undefined;
-  TranscodingInfo?: {
-    VideoCodec?: string | undefined;
-    AudioCodec?: string | undefined;
-    IsVideoDirect?: boolean | undefined;
-    IsAudioDirect?: boolean | undefined;
-    Bitrate?: number | undefined;
-    Framerate?: number | undefined;
-    CompletionPercentage?: number | undefined;
-    TranscodeReasons?: string[] | undefined;
-    HardwareAccelerationType?: string | undefined;
-  } | undefined;
+  NowPlayingItem?:
+    | {
+        Id: string;
+        Name: string;
+        Type: string;
+        RunTimeTicks?: number | undefined;
+      }
+    | undefined;
+  PlayState?:
+    | {
+        IsPaused?: boolean | undefined;
+        PositionTicks?: number | undefined;
+        PlayMethod?: string | undefined;
+      }
+    | undefined;
+  TranscodingInfo?:
+    | {
+        VideoCodec?: string | undefined;
+        AudioCodec?: string | undefined;
+        IsVideoDirect?: boolean | undefined;
+        IsAudioDirect?: boolean | undefined;
+        Bitrate?: number | undefined;
+        Framerate?: number | undefined;
+        CompletionPercentage?: number | undefined;
+        TranscodeReasons?: string[] | undefined;
+        HardwareAccelerationType?: string | undefined;
+      }
+    | undefined;
 }
 
 export interface JellyfinLibrary {
@@ -63,12 +69,14 @@ export interface JellyfinScheduledTask {
   Name: string;
   State: string;
   Category?: string | undefined;
-  LastExecutionResult?: {
-    StartTimeUtc: string;
-    EndTimeUtc: string;
-    Status: string;
-    ErrorMessage?: string | undefined;
-  } | undefined;
+  LastExecutionResult?:
+    | {
+        StartTimeUtc: string;
+        EndTimeUtc: string;
+        Status: string;
+        ErrorMessage?: string | undefined;
+      }
+    | undefined;
 }
 
 export interface JellyfinConnector {

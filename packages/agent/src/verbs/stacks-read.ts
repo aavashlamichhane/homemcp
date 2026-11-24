@@ -43,8 +43,12 @@ export function registerStacksReadVerbs(registry: VerbRegistry, cfg: StacksReadC
             }),
           ),
           policy_allowed: z.boolean(),
-          policy_violations: z.array(z.object({ service: z.string(), rule: z.string(), message: z.string() })),
-          policy_warnings: z.array(z.object({ service: z.string(), rule: z.string(), message: z.string() })),
+          policy_violations: z.array(
+            z.object({ service: z.string(), rule: z.string(), message: z.string() }),
+          ),
+          policy_warnings: z.array(
+            z.object({ service: z.string(), rule: z.string(), message: z.string() }),
+          ),
         }),
       ),
     }),
@@ -55,8 +59,19 @@ export function registerStacksReadVerbs(registry: VerbRegistry, cfg: StacksReadC
         dir: string;
         compose_files: string[];
         compose_yaml_redacted_source?: string | undefined;
-        services: Array<{ name: string; image?: string | undefined; ports: string[]; volumes: string[] }>;
-        env_files: Array<{ name: string; mode: string; uid: number; gid: number; size_bytes: number }>;
+        services: Array<{
+          name: string;
+          image?: string | undefined;
+          ports: string[];
+          volumes: string[];
+        }>;
+        env_files: Array<{
+          name: string;
+          mode: string;
+          uid: number;
+          gid: number;
+          size_bytes: number;
+        }>;
         policy_allowed: boolean;
         policy_violations: Array<{ service: string; rule: string; message: string }>;
         policy_warnings: Array<{ service: string; rule: string; message: string }>;
@@ -129,10 +144,16 @@ export function registerStacksReadVerbs(registry: VerbRegistry, cfg: StacksReadC
           }> = [];
           if (rawCompose) {
             try {
-              const doc = parseYaml(rawCompose) as { services?: Record<string, Record<string, unknown>> };
+              const doc = parseYaml(rawCompose) as {
+                services?: Record<string, Record<string, unknown>>;
+              };
               for (const [svcName, svc] of Object.entries(doc?.services ?? {})) {
                 const ports = Array.isArray(svc['ports'])
-                  ? svc['ports'].map((p) => (typeof p === 'string' || typeof p === 'number' ? String(p) : JSON.stringify(p)))
+                  ? svc['ports'].map((p) =>
+                      typeof p === 'string' || typeof p === 'number'
+                        ? String(p)
+                        : JSON.stringify(p),
+                    )
                   : [];
                 const volumes = Array.isArray(svc['volumes'])
                   ? svc['volumes'].map((v) => (typeof v === 'string' ? v : JSON.stringify(v)))

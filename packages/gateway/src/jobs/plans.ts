@@ -107,8 +107,7 @@ export class PlanManager {
 
   public getPlan(planId: string): PlanRecord | undefined {
     const row = this.db.db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     return row ? this.rowToPlan(row) : undefined;
   }
 

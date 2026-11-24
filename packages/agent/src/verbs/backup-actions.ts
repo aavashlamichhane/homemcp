@@ -13,10 +13,7 @@ export const BACKUP_SETS = [
   'all',
 ] as const;
 
-export function registerBackupActionVerbs(
-  registry: VerbRegistry,
-  runner: CommandRunner,
-): void {
+export function registerBackupActionVerbs(registry: VerbRegistry, runner: CommandRunner): void {
   registry.register({
     name: 'backup.run',
     inputSchema: z
@@ -68,7 +65,10 @@ export function registerBackupActionVerbs(
     inputSchema: z
       .object({
         set: z.enum(['vaultwarden']).default('vaultwarden'),
-        snapshot_id: z.string().regex(/^(?:latest|[a-f0-9]{6,64})$/).default('latest'),
+        snapshot_id: z
+          .string()
+          .regex(/^(?:latest|[a-f0-9]{6,64})$/)
+          .default('latest'),
       })
       .strict(),
     outputSchema: z.object({
@@ -97,9 +97,23 @@ export function registerBackupActionVerbs(
     name: 'backup.restore_staging',
     inputSchema: z
       .object({
-        set: z.enum(['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata']),
-        snapshot_id: z.string().regex(/^(?:latest|[a-f0-9]{6,64})$/).default('latest'),
-        staging_subdir: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).default('manual-restore'),
+        set: z.enum([
+          'vaultwarden',
+          'configs',
+          'npm',
+          'navidrome',
+          'system',
+          'jellyfin',
+          'userdata',
+        ]),
+        snapshot_id: z
+          .string()
+          .regex(/^(?:latest|[a-f0-9]{6,64})$/)
+          .default('latest'),
+        staging_subdir: z
+          .string()
+          .regex(/^[A-Za-z0-9_-]{1,40}$/)
+          .default('manual-restore'),
       })
       .strict(),
     outputSchema: z.object({
@@ -112,7 +126,14 @@ export function registerBackupActionVerbs(
     handler: async ({ set, snapshot_id, staging_subdir }) => {
       const res = await runner.run(
         '/usr/bin/sudo',
-        ['-n', '/usr/local/sbin/homemcp-backup', 'restore-staging', set, snapshot_id, staging_subdir],
+        [
+          '-n',
+          '/usr/local/sbin/homemcp-backup',
+          'restore-staging',
+          set,
+          snapshot_id,
+          staging_subdir,
+        ],
         { timeoutMs: 300_000, allowNonZero: true },
       );
       return {
@@ -129,7 +150,15 @@ export function registerBackupActionVerbs(
     name: 'backup.prune_set',
     inputSchema: z
       .object({
-        set: z.enum(['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata']),
+        set: z.enum([
+          'vaultwarden',
+          'configs',
+          'npm',
+          'navidrome',
+          'system',
+          'jellyfin',
+          'userdata',
+        ]),
         dry_run: z.boolean().default(true),
       })
       .strict(),

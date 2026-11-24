@@ -4,3 +4,4 @@ dev/
 AGENTS.md
 pnpm-lock.yaml
 evals/results/
+*.hbs

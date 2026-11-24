@@ -50,7 +50,10 @@ export function assertSafeTunnelIngress(
   }
   // Protected prefixes (ssh.* and homemcp.*) present in prev MUST NOT be dropped
   for (const oldRule of prev.ingress) {
-    if (oldRule.hostname && (oldRule.hostname.startsWith('ssh.') || oldRule.hostname.startsWith('homemcp.'))) {
+    if (
+      oldRule.hostname &&
+      (oldRule.hostname.startsWith('ssh.') || oldRule.hostname.startsWith('homemcp.'))
+    ) {
       const preserved = ingress.find(
         (r) => r.hostname === oldRule.hostname && r.service === oldRule.service,
       );
@@ -72,7 +75,12 @@ export interface CloudflareConnector {
     id: string;
     name: string;
     status: string;
-    connections: Array<{ id: string; origin_ip: string; client_version: string; opened_at: string }>;
+    connections: Array<{
+      id: string;
+      origin_ip: string;
+      client_version: string;
+      opened_at: string;
+    }>;
   }>;
   getTunnelConfig(): Promise<CloudflareTunnelConfig>;
   listDnsRecords(): Promise<CloudflareDnsRecord[]>;
@@ -82,7 +90,11 @@ export interface CloudflareConnector {
   ): Promise<{ previous: CloudflareTunnelConfig; current: CloudflareTunnelConfig }>;
   upsertDnsCname(zoneName: string, hostname: string): Promise<CloudflareDnsRecord>;
   deleteDnsCname(zoneId: string, recordId: string): Promise<void>;
-  upsertAccessApp(opts: { name: string; domain: string; allowedEmails: readonly string[] }): Promise<CloudflareAccessApp>;
+  upsertAccessApp(opts: {
+    name: string;
+    domain: string;
+    allowedEmails: readonly string[];
+  }): Promise<CloudflareAccessApp>;
   deleteAccessApp(appId: string): Promise<void>;
 }
 
@@ -250,16 +262,20 @@ export class HttpCloudflareConnector implements CloudflareConnector {
     const target = `${this.tunnelId}.cfargotunnel.com`;
     const body = { type: 'CNAME', name: hostname, content: target, proxied: true, ttl: 1 };
     const saved = existing[0]
-      ? await this.cfRequest<{ id: string; name: string; type: string; content: string; proxied?: boolean }>(
-          `/zones/${zone.id}/dns_records/${existing[0].id}`,
-          'PUT',
-          body,
-        )
-      : await this.cfRequest<{ id: string; name: string; type: string; content: string; proxied?: boolean }>(
-          `/zones/${zone.id}/dns_records`,
-          'POST',
-          body,
-        );
+      ? await this.cfRequest<{
+          id: string;
+          name: string;
+          type: string;
+          content: string;
+          proxied?: boolean;
+        }>(`/zones/${zone.id}/dns_records/${existing[0].id}`, 'PUT', body)
+      : await this.cfRequest<{
+          id: string;
+          name: string;
+          type: string;
+          content: string;
+          proxied?: boolean;
+        }>(`/zones/${zone.id}/dns_records`, 'POST', body);
     return {
       id: saved.id,
       zone_id: zone.id,

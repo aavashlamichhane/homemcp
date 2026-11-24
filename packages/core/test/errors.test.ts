@@ -19,10 +19,11 @@ describe('errors, tiers, untrusted, output', () => {
     expect(hasRequiredScope(['homemcp:admin'], 'homemcp:read')).toBe(true);
     expect(hasRequiredScope(['homemcp:read'], 'homemcp:operate')).toBe(false);
     expect(
-      parseToolsetFilter('music,naviload,stacks', ['core', 'music', 'naviload', 'stacks'], [
-        'music',
-        'naviload',
-      ]),
+      parseToolsetFilter(
+        'music,naviload,stacks',
+        ['core', 'music', 'naviload', 'stacks'],
+        ['music', 'naviload'],
+      ),
     ).toEqual(['music', 'naviload']);
   });
 

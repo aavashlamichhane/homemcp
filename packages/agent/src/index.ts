@@ -40,7 +40,9 @@ async function main(): Promise<void> {
   const hmacFile = process.env['AGENT_HMAC_SECRET_FILE'] ?? '/etc/homemcp/agent-hmac.secret';
   const configFile = process.env['AGENT_CONFIG_FILE'];
 
-  const hmacSecret = (process.env['AGENT_HMAC_SECRET'] ?? (await readFile(hmacFile, 'utf8'))).trim();
+  const hmacSecret = (
+    process.env['AGENT_HMAC_SECRET'] ?? (await readFile(hmacFile, 'utf8'))
+  ).trim();
   if (!hmacSecret) {
     throw new Error('AGENT_HMAC_SECRET is empty');
   }
@@ -69,8 +71,17 @@ async function main(): Promise<void> {
   registerBackupActionVerbs(registry, runner);
   registerOpsWriteVerbs(registry, {
     runner,
-    protectedContainers: fileCfg.protectedContainers ?? ['cloudflared-*', 'nginx-pm-app-1', 'homemcp', 'vaultwarden'],
-    protectedUnits: fileCfg.protectedUnits ?? ['ssh.service', 'tailscaled.service', 'homemcpd.service'],
+    protectedContainers: fileCfg.protectedContainers ?? [
+      'cloudflared-*',
+      'nginx-pm-app-1',
+      'homemcp',
+      'vaultwarden',
+    ],
+    protectedUnits: fileCfg.protectedUnits ?? [
+      'ssh.service',
+      'tailscaled.service',
+      'homemcpd.service',
+    ],
     allowedUnits: fileCfg.allowedUnits ?? [],
     stackRoots: fileCfg.stackRoots ?? [],
   });

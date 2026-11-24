@@ -1,10 +1,6 @@
 export type Tier = 'T0' | 'T1' | 'T2' | 'T3';
 
-export type Scope =
-  | 'homemcp:read'
-  | 'homemcp:operate'
-  | 'homemcp:admin'
-  | 'homemcp:audit';
+export type Scope = 'homemcp:read' | 'homemcp:operate' | 'homemcp:admin' | 'homemcp:audit';
 
 export const ALL_SCOPES: readonly Scope[] = [
   'homemcp:read',

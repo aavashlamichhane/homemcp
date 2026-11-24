@@ -56,7 +56,8 @@ export function registerFilesModule(deps: GatewayDeps): void {
     name: 'files_search',
     toolset: 'files',
     tier: 'T0',
-    description: 'Searches filenames matching a case-insensitive pattern within allowed roots (skips denied files). Read-only.',
+    description:
+      'Searches filenames matching a case-insensitive pattern within allowed roots (skips denied files). Read-only.',
     annotations: {
       title: 'Search Files',
       readOnlyHint: true,
@@ -96,7 +97,9 @@ export function registerFilesModule(deps: GatewayDeps): void {
     inputSchema: z.object({ path: z.string().min(1) }).strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args) => {
-      const res = await deps.agent.call<Record<string, unknown>>('files.disk_usage', { path: args.path });
+      const res = await deps.agent.call<Record<string, unknown>>('files.disk_usage', {
+        path: args.path,
+      });
       return {
         summary: `Disk usage for ${args.path}: ${String(res['total_bytes'])} bytes`,
         structured: res,
@@ -146,7 +149,9 @@ export function registerFilesModule(deps: GatewayDeps): void {
     inputSchema: z.object({ path: z.string().min(1) }).strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args) => {
-      const res = await deps.agent.call<Record<string, unknown>>('files.mkdir', { path: args.path });
+      const res = await deps.agent.call<Record<string, unknown>>('files.mkdir', {
+        path: args.path,
+      });
       return {
         summary: `Created directory ${args.path}`,
         structured: res,
@@ -158,7 +163,8 @@ export function registerFilesModule(deps: GatewayDeps): void {
     name: 'files_write_plan',
     toolset: 'files',
     tier: 'T0',
-    description: 'Plans writing a non-secret file inside stack roots and returns a diff plan_id for files_write_apply. Read-only.',
+    description:
+      'Plans writing a non-secret file inside stack roots and returns a diff plan_id for files_write_apply. Read-only.',
     annotations: {
       title: 'Plan File Write',
       readOnlyHint: true,
@@ -247,7 +253,8 @@ export function registerFilesModule(deps: GatewayDeps): void {
     name: 'files_move',
     toolset: 'files',
     tier: 'T2',
-    description: 'Moves/renames a file inside allowed roots (plan-first when overwrite=true or plan_id omitted).',
+    description:
+      'Moves/renames a file inside allowed roots (plan-first when overwrite=true or plan_id omitted).',
     annotations: {
       title: 'Move/Rename File',
       readOnlyHint: false,
@@ -329,7 +336,8 @@ export function registerFilesModule(deps: GatewayDeps): void {
     name: 'files_trash',
     toolset: 'files',
     tier: 'T2',
-    description: 'Moves a file or directory to `.trash` inside its root (30-day soft delete; plan-first).',
+    description:
+      'Moves a file or directory to `.trash` inside its root (30-day soft delete; plan-first).',
     annotations: {
       title: 'Trash File',
       readOnlyHint: false,

@@ -43,9 +43,9 @@ export class OwnerAuthService {
     const owner = this.db.db
       .prepare('SELECT bootstrapped_at FROM auth_owner WHERE id = ?')
       .get('owner') as { bootstrapped_at: string | null } | undefined;
-    const passkeyCount = this.db.db
-      .prepare('SELECT count(*) AS cnt FROM auth_passkeys')
-      .get() as { cnt: number };
+    const passkeyCount = this.db.db.prepare('SELECT count(*) AS cnt FROM auth_passkeys').get() as {
+      cnt: number;
+    };
     return Boolean(owner?.bootstrapped_at) && passkeyCount.cnt > 0;
   }
 
@@ -138,14 +138,7 @@ export class OwnerAuthService {
         `INSERT INTO auth_passkeys (credential_id, public_key, counter, transports_json, name, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(
-        credential.id,
-        pubB64,
-        credential.counter,
-        JSON.stringify(transports),
-        name,
-        now,
-      );
+      .run(credential.id, pubB64, credential.counter, JSON.stringify(transports), name, now);
 
     this.ensureOwnerRow(now);
     return {
@@ -236,9 +229,7 @@ export class OwnerAuthService {
 
     const enc = encryptAtRest(secret, this.opts.secretKey);
     this.ensureOwnerRow(new Date().toISOString());
-    this.db.db
-      .prepare('UPDATE auth_owner SET totp_secret_enc = ? WHERE id = ?')
-      .run(enc, 'owner');
+    this.db.db.prepare('UPDATE auth_owner SET totp_secret_enc = ? WHERE id = ?').run(enc, 'owner');
 
     // Generate 10 one-time recovery codes
     this.db.db.prepare('DELETE FROM auth_recovery_codes').run();
@@ -255,16 +246,21 @@ export class OwnerAuthService {
     return { secret, otpauthUri, qrDataUrl, recoveryCodes: codes };
   }
 
-  public async verifyTotpOrRecovery(codeInput: string, lockoutKey = 'owner-totp'): Promise<boolean> {
+  public async verifyTotpOrRecovery(
+    codeInput: string,
+    lockoutKey = 'owner-totp',
+  ): Promise<boolean> {
     const now = Date.now();
     const lockRow = this.db.db
       .prepare('SELECT failures, window_start, locked_until FROM auth_lockouts WHERE key = ?')
       .get(lockoutKey) as
-      | { failures: number; window_start: number; locked_until: number | null }
-      | undefined;
+      { failures: number; window_start: number; locked_until: number | null } | undefined;
 
     if (lockRow?.locked_until && lockRow.locked_until > now) {
-      throw new HomemcpError('RATE_LIMITED', 'Too many failed TOTP attempts; locked for 15 minutes');
+      throw new HomemcpError(
+        'RATE_LIMITED',
+        'Too many failed TOTP attempts; locked for 15 minutes',
+      );
     }
 
     const clean = codeInput.trim();

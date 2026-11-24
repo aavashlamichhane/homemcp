@@ -9,15 +9,12 @@ export interface RedactionResult<T = unknown> {
 const SENSITIVE_KEY_RE =
   /(?:^|_|-)(token|password|passwd|secret|apikey|api_key|key|pass|credential|auth_token|private_key)(?:$|_|-)/i;
 
-const ENV_LINE_RE =
-  /^(\s*(?:export\s+)?)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(.+?)(\s*)$/;
+const ENV_LINE_RE = /^(\s*(?:export\s+)?)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(.+?)(\s*)$/;
 
-const YAML_KV_RE =
-  /^(\s*(?:-\s*)?)([A-Za-z_][A-Za-z0-9_.-]*)(\s*:\s*)(.+?)(\s*)$/;
+const YAML_KV_RE = /^(\s*(?:-\s*)?)([A-Za-z_][A-Za-z0-9_.-]*)(\s*:\s*)(.+?)(\s*)$/;
 
 const SAFE_EXACT_PLACEHOLDER_RE = /^«redacted:[^»]+»$/;
-const SAFE_UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SAFE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SAFE_DIGEST_RE = /^(?:sha256|sha512):[0-9a-f]{32,128}$/i;
 const SAFE_HEX_ID_RE = /^[0-9a-f]{32,64}$/i;
 const SAFE_PATH_RE = /^(?:\/[\w.\-@]+)+$/;
@@ -117,7 +114,10 @@ export class Redactor {
     }
   }
 
-  public redactString(input: string, options?: { highEntropyContext?: boolean }): {
+  public redactString(
+    input: string,
+    options?: { highEntropyContext?: boolean },
+  ): {
     text: string;
     count: number;
   } {
@@ -161,7 +161,7 @@ export class Redactor {
       return marker('cf_tunnel', tok);
     });
 
-    // Layer 3c: Authorization / Cookie headers
+    // Layer 3c: Authorization / Bearer / Cookie headers
     text = text.replace(
       /\b(Authorization\s*:\s*(?:Bearer|Basic|Token)\s+)([^\s\r\n"']+)/gi,
       (_m, p1: string, tok: string) => {
@@ -171,13 +171,18 @@ export class Redactor {
       },
     );
     text = text.replace(
-      /\b((?:Set-)?Cookie\s*:\s*)([^\r\n]+)/gi,
-      (_m, p1: string, val: string) => {
-        if (SAFE_EXACT_PLACEHOLDER_RE.test(val.trim())) return `${p1}${val}`;
+      /\b(Bearer[\t \r\n]+)([^\s\r\n"']{10,})/gi,
+      (_m, p1: string, tok: string) => {
+        if (SAFE_EXACT_PLACEHOLDER_RE.test(tok)) return `${p1}${tok}`;
         count++;
-        return `${p1}${marker('cookie', val)}`;
+        return `${p1}${marker('bearer', tok)}`;
       },
     );
+    text = text.replace(/\b((?:Set-)?Cookie\s*:\s*)([^\r\n]+)/gi, (_m, p1: string, val: string) => {
+      if (SAFE_EXACT_PLACEHOLDER_RE.test(val.trim())) return `${p1}${val}`;
+      count++;
+      return `${p1}${marker('cookie', val)}`;
+    });
 
     // Layer 3d: URLs with embedded user:pass@host
     text = text.replace(
@@ -191,19 +196,16 @@ export class Redactor {
 
     // Layer 3e: Well-known token prefixes and JWTs
     text = text.replace(
-      /\b(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gsk_[A-Za-z0-9]{20,}|sk-or-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|tk_[a-z0-9]{16,}|hmp_[A-Za-z0-9_-]{16,})\b/g,
+      /\b(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gsk_[A-Za-z0-9]{20,}|sk-or-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|tk_[a-z0-9]{16,}|hmp_[A-Za-z0-9_-]{16,}|cfut_[A-Za-z0-9_-]{20,}|cfat_[A-Za-z0-9_-]{20,})\b/g,
       (tok) => {
         count++;
         return marker('token', tok);
       },
     );
-    text = text.replace(
-      /\bsk-[A-Za-z0-9_-]{20,}\b/g,
-      (tok) => {
-        count++;
-        return marker('token', tok);
-      },
-    );
+    text = text.replace(/\bsk-[A-Za-z0-9_-]{20,}\b/g, (tok) => {
+      count++;
+      return marker('token', tok);
+    });
     text = text.replace(
       /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
       (tok) => {
@@ -288,10 +290,7 @@ export class Redactor {
     return { text, count };
   }
 
-  public redactValue<T>(
-    value: T,
-    options?: { highEntropyContext?: boolean },
-  ): RedactionResult<T> {
+  public redactValue<T>(value: T, options?: { highEntropyContext?: boolean }): RedactionResult<T> {
     let totalCount = 0;
     const seen = new WeakSet<object>();
 

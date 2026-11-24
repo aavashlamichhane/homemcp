@@ -26,7 +26,12 @@ export function registerDockerModule(deps: GatewayDeps): void {
       const [containers, scan] = await Promise.all([
         deps.docker ? deps.docker.listContainers(true) : Promise.resolve([]),
         deps.agent.call<{
-          stacks: Array<{ name: string; dir: string; services: unknown[]; policy_allowed: boolean }>;
+          stacks: Array<{
+            name: string;
+            dir: string;
+            services: unknown[];
+            policy_allowed: boolean;
+          }>;
         }>('stacks.scan'),
       ]);
 
@@ -51,7 +56,9 @@ export function registerDockerModule(deps: GatewayDeps): void {
         state: c.State,
         status: c.Status,
         project: c.Labels['com.docker.compose.project'] ?? null,
-        ports: c.Ports.map((p) => `${p.IP ?? '*'}:${p.PublicPort ?? ''}->${p.PrivatePort}/${p.Type}`),
+        ports: c.Ports.map(
+          (p) => `${p.IP ?? '*'}:${p.PublicPort ?? ''}->${p.PrivatePort}/${p.Type}`,
+        ),
       }));
 
       return {
@@ -227,7 +234,9 @@ export function registerDockerModule(deps: GatewayDeps): void {
         }),
       );
       return {
-        summary: stats.map((s) => `${s.name}: ${Math.round(s.mem_usage_bytes / 1e6)} MB`).join('\n'),
+        summary: stats
+          .map((s) => `${s.name}: ${Math.round(s.mem_usage_bytes / 1e6)} MB`)
+          .join('\n'),
         structured: { stats },
       };
     },
@@ -362,11 +371,17 @@ export function registerDockerModule(deps: GatewayDeps): void {
         const plan = deps.plans.createPlan({
           tool: 'docker_container_action',
           tier,
-          payload: { name: args.name, action: args.action, override_protected: args.override_protected },
+          payload: {
+            name: args.name,
+            action: args.action,
+            override_protected: args.override_protected,
+          },
           summary: `Execute docker ${args.action} on "${args.name}"`,
           diff: `container ${args.name}: ${args.action}`,
           sideEffects: [`Container "${args.name}" will ${args.action}`],
-          rollback: [`Run docker_container_action(${args.name}, ${args.action === 'stop' ? 'start' : 'restart'})`],
+          rollback: [
+            `Run docker_container_action(${args.name}, ${args.action === 'stop' ? 'start' : 'restart'})`,
+          ],
           createdBy: ctx.auth.subject,
         });
         const chal = deps.confirmations.createChallenge(plan.id, 'url');
@@ -563,7 +578,11 @@ export function registerDockerModule(deps: GatewayDeps): void {
         const plan = deps.plans.createPlan({
           tool: 'docker_rollback_service',
           tier: 'T2',
-          payload: { stack_dir: args.stack_dir, service: args.service, target_image: args.previous_image },
+          payload: {
+            stack_dir: args.stack_dir,
+            service: args.service,
+            target_image: args.previous_image,
+          },
           summary: `Rollback ${args.service} to ${args.previous_image}`,
           diff: `service ${args.service} -> ${args.previous_image}`,
           sideEffects: [`Restarts ${args.service} on pinned prior image`],

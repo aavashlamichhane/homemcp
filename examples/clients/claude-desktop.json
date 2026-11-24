@@ -2,13 +2,7 @@
   "mcpServers": {
     "homemcp-mock": {
       "command": "node",
-      "args": [
-        "packages/gateway/dist/cli.js",
-        "serve",
-        "--transport",
-        "stdio",
-        "--mock"
-      ]
+      "args": ["packages/gateway/dist/cli.js", "serve", "--transport", "stdio", "--mock"]
     }
   }
 }

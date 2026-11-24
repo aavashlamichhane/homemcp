@@ -179,7 +179,8 @@ export function registerBackupModule(deps: GatewayDeps): void {
     name: 'backup_verify',
     toolset: 'backup',
     tier: 'T1',
-    description: 'Runs restic repository maintenance and integrity check (`homemcp-backup maint`) as a tracked job.',
+    description:
+      'Runs restic repository maintenance and integrity check (`homemcp-backup maint`) as a tracked job.',
     annotations: {
       title: 'Verify Backup Repository',
       readOnlyHint: false,
@@ -237,19 +238,23 @@ export function registerBackupModule(deps: GatewayDeps): void {
     handler: async (args, ctx) => {
       let exitCode = 1;
       let output = '';
-      const job = deps.jobs.startBackground('backup_restore_test', ctx.auth.subject, async (jctx) => {
-        await jctx.addStep(`Running temporary restore test for ${args.set}`, 25);
-        const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
-          'backup.restore_test',
-          { set: args.set },
-        );
-        exitCode = res.exit_code;
-        output = res.output;
-        if (res.exit_code !== 0) {
-          throw new Error(`Restore test failed: ${res.output}`);
-        }
-        return res;
-      });
+      const job = deps.jobs.startBackground(
+        'backup_restore_test',
+        ctx.auth.subject,
+        async (jctx) => {
+          await jctx.addStep(`Running temporary restore test for ${args.set}`, 25);
+          const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
+            'backup.restore_test',
+            { set: args.set },
+          );
+          exitCode = res.exit_code;
+          output = res.output;
+          if (res.exit_code !== 0) {
+            throw new Error(`Restore test failed: ${res.output}`);
+          }
+          return res;
+        },
+      );
       await deps.jobs.waitForJob(job.id);
       const finalJob = deps.jobs.getJob(job.id)!;
       return {
@@ -281,17 +286,37 @@ export function registerBackupModule(deps: GatewayDeps): void {
     },
     inputSchema: z
       .object({
-        set: z.enum(['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata']),
-        snapshot_id: z.string().regex(/^(?:latest|[a-f0-9]{6,64})$/).default('latest'),
-        staging_subdir: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).default('manual-restore'),
+        set: z.enum([
+          'vaultwarden',
+          'configs',
+          'npm',
+          'navidrome',
+          'system',
+          'jellyfin',
+          'userdata',
+        ]),
+        snapshot_id: z
+          .string()
+          .regex(/^(?:latest|[a-f0-9]{6,64})$/)
+          .default('latest'),
+        staging_subdir: z
+          .string()
+          .regex(/^[A-Za-z0-9_-]{1,40}$/)
+          .default('manual-restore'),
         plan_id: z.string().optional(),
       })
       .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       const stagingTarget = `/var/lib/homemcp/backup/staging-restore/${args.staging_subdir}`;
-      if (stagingTarget.includes('..') || !stagingTarget.startsWith('/var/lib/homemcp/backup/staging-restore/')) {
-        throw new HomemcpError('POLICY_DENIED', 'Restore must target isolated staging directory only');
+      if (
+        stagingTarget.includes('..') ||
+        !stagingTarget.startsWith('/var/lib/homemcp/backup/staging-restore/')
+      ) {
+        throw new HomemcpError(
+          'POLICY_DENIED',
+          'Restore must target isolated staging directory only',
+        );
       }
       if (!args.plan_id) {
         const plan = deps.plans.createPlan({

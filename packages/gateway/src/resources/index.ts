@@ -94,7 +94,9 @@ export function registerResources(deps: GatewayDeps): void {
     handler: async () => {
       const [hosts, ingress, dns] = await Promise.all([
         deps.npm ? deps.npm.listProxyHosts().catch(() => []) : Promise.resolve([]),
-        deps.cloudflare ? deps.cloudflare.getTunnelConfig().catch(() => null) : Promise.resolve(null),
+        deps.cloudflare
+          ? deps.cloudflare.getTunnelConfig().catch(() => null)
+          : Promise.resolve(null),
         deps.cloudflare ? deps.cloudflare.listDnsRecords().catch(() => []) : Promise.resolve([]),
       ]);
       return JSON.stringify({ hosts, ingress, dns }, null, 2);
@@ -126,19 +128,23 @@ export function registerResources(deps: GatewayDeps): void {
     title: 'Open Alerts',
     description: 'Currently pending and firing alerts evaluated by homemcp watcher',
     mimeType: 'application/json',
-    handler: () => Promise.resolve(JSON.stringify(deps.watcher.listAlerts({ includeResolved: false }), null, 2)),
+    handler: () =>
+      Promise.resolve(JSON.stringify(deps.watcher.listAlerts({ includeResolved: false }), null, 2)),
   });
 
   registry.registerResource({
     name: 'docs-runbooks',
     template: 'homemcp://docs/runbooks/{topic}',
     title: 'Operational Runbooks',
-    description: 'Emergency & operational Markdown runbooks (restore-vaultwarden, rotate-tunnel-token, add-service, disk-full, break-glass)',
+    description:
+      'Emergency & operational Markdown runbooks (restore-vaultwarden, rotate-tunnel-token, add-service, disk-full, break-glass)',
     mimeType: 'text/markdown',
     list: () => {
       const dir = resolveRunbooksDir();
       const files = existsSync(dir)
-        ? readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => f.replace(/\.md$/, ''))
+        ? readdirSync(dir)
+            .filter((f) => f.endsWith('.md'))
+            .map((f) => f.replace(/\.md$/, ''))
         : [];
       return Promise.resolve({
         resources: files.map((topic) => ({

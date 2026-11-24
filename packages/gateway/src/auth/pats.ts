@@ -34,11 +34,7 @@ function ipToBigInt(ip: string): { version: 4 | 6; value: bigint } | null {
     const rParts = right ? right.split(':').filter(Boolean) : [];
     const missing = 8 - (lParts.length + rParts.length);
     if (missing < 0) return null;
-    const full = [
-      ...lParts,
-      ...Array.from({ length: missing }, () => '0'),
-      ...rParts,
-    ];
+    const full = [...lParts, ...Array.from({ length: missing }, () => '0'), ...rParts];
     let val = 0n;
     for (const seg of full) {
       val = (val << 16n) | BigInt(parseInt(seg || '0', 16));
@@ -63,7 +59,7 @@ export function isIpAllowedByCidrs(ip: string, cidrs: readonly string[]): boolea
     if (!Number.isInteger(prefixLen) || prefixLen < 0 || prefixLen > maxBits) continue;
     if (prefixLen === 0) return true;
     const shift = BigInt(maxBits - prefixLen);
-    if ((parsedIp.value >> shift) === (parsedBase.value >> shift)) {
+    if (parsedIp.value >> shift === parsedBase.value >> shift) {
       return true;
     }
   }
@@ -134,9 +130,7 @@ export class PatManager {
   }
 
   public listPats(): PatRecord[] {
-    const rows = this.db.db
-      .prepare('SELECT * FROM pats ORDER BY created_at DESC')
-      .all() as Array<{
+    const rows = this.db.db.prepare('SELECT * FROM pats ORDER BY created_at DESC').all() as Array<{
       id: string;
       name: string;
       prefix: string;
@@ -173,9 +167,7 @@ export class PatManager {
     const dot = token.indexOf('.');
     if (!token.startsWith('hmp_') || dot < 0) return null;
     const prefix = token.slice(0, dot);
-    const rows = this.db.db
-      .prepare('SELECT * FROM pats WHERE prefix = ?')
-      .all(prefix) as Array<{
+    const rows = this.db.db.prepare('SELECT * FROM pats WHERE prefix = ?').all(prefix) as Array<{
       id: string;
       name: string;
       prefix: string;

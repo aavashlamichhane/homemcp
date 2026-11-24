@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { HomemcpError, type Redactor } from '@homemcp/core';
 import type { HomemcpDb } from '../db/database.js';
 
-export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting_user';
+export type JobStatus =
+  'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting_user';
 
 export interface JobStep {
   ts: string;
@@ -35,14 +36,14 @@ export interface JobContext {
 export class JobRunner {
   private readonly activePromises = new Map<string, Promise<void>>();
   private readonly onProgress:
-    | ((jobId: string, progress: number, message?: string) => Promise<void>)
-    | undefined;
+    ((jobId: string, progress: number, message?: string) => Promise<void>) | undefined;
 
   public constructor(
     private readonly db: HomemcpDb,
     private readonly redactor: Redactor,
     opts?: {
-      onProgress?: ((jobId: string, progress: number, message?: string) => Promise<void>) | undefined;
+      onProgress?:
+        ((jobId: string, progress: number, message?: string) => Promise<void>) | undefined;
     },
   ) {
     this.onProgress = opts?.onProgress;
@@ -50,7 +51,8 @@ export class JobRunner {
 
   private rowToJob(row: Record<string, unknown>): JobRecord {
     const stepsRaw = typeof row['steps_json'] === 'string' ? row['steps_json'] : '[]';
-    const resultRaw = typeof row['result_redacted'] === 'string' ? row['result_redacted'] : undefined;
+    const resultRaw =
+      typeof row['result_redacted'] === 'string' ? row['result_redacted'] : undefined;
     return {
       id: String(row['id']),
       kind: String(row['kind']),
@@ -69,12 +71,15 @@ export class JobRunner {
 
   public getJob(jobId: string): JobRecord | undefined {
     const row = this.db.db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     return row ? this.rowToJob(row) : undefined;
   }
 
-  public listJobs(opts?: { status?: JobStatus | undefined; kind?: string | undefined; limit?: number | undefined }): JobRecord[] {
+  public listJobs(opts?: {
+    status?: JobStatus | undefined;
+    kind?: string | undefined;
+    limit?: number | undefined;
+  }): JobRecord[] {
     const clauses: string[] = [];
     const args: Array<string | number> = [];
     if (opts?.status) {
@@ -97,7 +102,9 @@ export class JobRunner {
   public createJob(kind: string, createdBy: string, initialStep?: string): JobRecord {
     const id = `job_${randomUUID().slice(0, 12)}`;
     const now = new Date().toISOString();
-    const steps: JobStep[] = initialStep ? [{ ts: now, message: this.redactor.redactString(initialStep).text }] : [];
+    const steps: JobStep[] = initialStep
+      ? [{ ts: now, message: this.redactor.redactString(initialStep).text }]
+      : [];
     this.db.db
       .prepare(
         `INSERT INTO jobs (id, kind, status, progress, steps_json, created_by, created_at, cancel_requested)
@@ -131,7 +138,9 @@ export class JobRunner {
       });
     }
     const nextProgress =
-      patch.progress !== undefined ? Math.min(100, Math.max(0, Math.round(patch.progress))) : existing.progress;
+      patch.progress !== undefined
+        ? Math.min(100, Math.max(0, Math.round(patch.progress)))
+        : existing.progress;
     const redactedResult =
       patch.result !== undefined
         ? JSON.stringify(this.redactor.redactValue(patch.result).value)
@@ -139,7 +148,9 @@ export class JobRunner {
           ? JSON.stringify(existing.result_redacted)
           : null;
     const redactedErr =
-      patch.error !== undefined ? this.redactor.redactString(patch.error).text : (existing.error ?? null);
+      patch.error !== undefined
+        ? this.redactor.redactString(patch.error).text
+        : (existing.error ?? null);
 
     this.db.db
       .prepare(
@@ -165,7 +176,11 @@ export class JobRunner {
     if (!existing) {
       throw new HomemcpError('NOT_FOUND', `Job not found: ${jobId}`);
     }
-    if (existing.status === 'succeeded' || existing.status === 'failed' || existing.status === 'cancelled') {
+    if (
+      existing.status === 'succeeded' ||
+      existing.status === 'failed' ||
+      existing.status === 'cancelled'
+    ) {
       return existing;
     }
     this.db.db.prepare('UPDATE jobs SET cancel_requested = 1 WHERE id = ?').run(jobId);
@@ -277,9 +292,9 @@ export class JobRunner {
   }
 
   public reconcileOnBoot(): number {
-    const rows = this.db.db
-      .prepare("SELECT id FROM jobs WHERE status = 'running'")
-      .all() as Array<{ id: string }>;
+    const rows = this.db.db.prepare("SELECT id FROM jobs WHERE status = 'running'").all() as Array<{
+      id: string;
+    }>;
     for (const r of rows) {
       this.updateJob(r.id, {
         status: 'failed',

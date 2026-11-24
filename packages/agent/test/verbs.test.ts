@@ -121,7 +121,8 @@ class FakeRunner implements CommandRunner {
     }
     if (binary === '/usr/bin/ss') {
       return {
-        stdout: 'tcp LISTEN 0 128 127.0.0.1:8191 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\n',
+        stdout:
+          'tcp LISTEN 0 128 127.0.0.1:8191 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\n',
         stderr: '',
         exitCode: 0,
       };
@@ -146,7 +147,11 @@ class FakeRunner implements CommandRunner {
       };
     }
     if (binary === '/usr/bin/ip' && args.includes('route')) {
-      return { stdout: JSON.stringify([{ dst: 'default', gateway: '192.0.2.1' }]), stderr: '', exitCode: 0 };
+      return {
+        stdout: JSON.stringify([{ dst: 'default', gateway: '192.0.2.1' }]),
+        stderr: '',
+        exitCode: 0,
+      };
     }
     return { stdout: '', stderr: '', exitCode: 0 };
   }
@@ -208,7 +213,9 @@ describe('P1 agent verbs and HTTP-over-socket server', () => {
         smart_status: { passed: true },
         temperature: { current: 35 },
         power_on_time: { hours: 1000 },
-        ata_smart_attributes: { table: [{ id: 5, name: 'Reallocated_Sector_Ct', raw: { value: 0 } }] },
+        ata_smart_attributes: {
+          table: [{ id: 5, name: 'Reallocated_Sector_Ct', raw: { value: 0 } }],
+        },
       }),
     );
 
@@ -228,10 +235,7 @@ describe('P1 agent verbs and HTTP-over-socket server', () => {
 
     // Secret in .env must NEVER appear in stacks.scan output
     const canarySecret = 'TOP_SECRET_CANARY_VALUE_999';
-    await writeFile(
-      path.join(stacksRoot, 'myapp', '.env'),
-      `APP_SECRET=${canarySecret}\n`,
-    );
+    await writeFile(path.join(stacksRoot, 'myapp', '.env'), `APP_SECRET=${canarySecret}\n`);
     await writeFile(
       path.join(stacksRoot, 'myapp', 'docker-compose.yml'),
       'services:\n  app:\n    image: alpine:3.20\n    restart: unless-stopped\n    mem_limit: 128m\n    pids_limit: 64\n',
@@ -268,19 +272,29 @@ describe('P1 agent verbs and HTTP-over-socket server', () => {
           headers: { 'content-type': 'application/json', ...headers },
           body: rawBody,
         });
-        return { status: resp.status, data: (await resp.json()) as { ok: boolean; result?: unknown; error?: unknown } };
+        return {
+          status: resp.status,
+          data: (await resp.json()) as { ok: boolean; result?: unknown; error?: unknown },
+        };
       };
 
       const health = await callRpc('system.health');
       expect(health.status).toBe(200);
-      expect((health.data.result as { battery?: { ac_online?: boolean } }).battery?.ac_online).toBe(true);
+      expect((health.data.result as { battery?: { ac_online?: boolean } }).battery?.ac_online).toBe(
+        true,
+      );
 
       const metrics = await callRpc('system.metrics_history', { group: 'cpu', max_points: 50 });
-      expect((metrics.data.result as { points: unknown[]; truncated: boolean }).points.length).toBeLessThanOrEqual(50);
+      expect(
+        (metrics.data.result as { points: unknown[]; truncated: boolean }).points.length,
+      ).toBeLessThanOrEqual(50);
       expect((metrics.data.result as { truncated: boolean }).truncated).toBe(true);
 
       const disks = await callRpc('system.disks');
-      expect((disks.data.result as { smart_summary: Array<{ device: string }> }).smart_summary[0]?.device).toBe('sda');
+      expect(
+        (disks.data.result as { smart_summary: Array<{ device: string }> }).smart_summary[0]
+          ?.device,
+      ).toBe('sda');
 
       const smart = await callRpc('system.smart_details', { device: 'sda' });
       expect((smart.data.result as { passed: boolean }).passed).toBe(true);
@@ -289,7 +303,9 @@ describe('P1 agent verbs and HTTP-over-socket server', () => {
       expect(JSON.stringify(procs.data.result)).not.toContain('supersecret999');
 
       const errs = await callRpc('system.errors_summary');
-      const sigs = (errs.data.result as { signatures: Array<{ count: number; known_noise: boolean }> }).signatures;
+      const sigs = (
+        errs.data.result as { signatures: Array<{ count: number; known_noise: boolean }> }
+      ).signatures;
       expect(sigs.some((s) => s.count === 2)).toBe(true);
       expect(sigs.some((s) => s.known_noise)).toBe(true);
 
@@ -303,7 +319,9 @@ describe('P1 agent verbs and HTTP-over-socket server', () => {
       expect((net.data.result as { nameservers: string[] }).nameservers).toContain('1.1.1.1');
 
       const svcs = await callRpc('system.services');
-      expect((svcs.data.result as { services: Array<{ unit: string }> }).services[0]?.unit).toBe('smbd.service');
+      expect((svcs.data.result as { services: Array<{ unit: string }> }).services[0]?.unit).toBe(
+        'smbd.service',
+      );
 
       const deniedSvc = await callRpc('system.services', { units: ['ssh.service'] });
       expect(deniedSvc.status).toBe(403);

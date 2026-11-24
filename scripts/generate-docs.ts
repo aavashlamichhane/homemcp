@@ -54,10 +54,17 @@ function main(): void {
       lines.push('');
     }
 
-    lines.push('## Resources', '', '| URI / Template | Scope | Mime | Description |', '|---|---|---|---|');
+    lines.push(
+      '## Resources',
+      '',
+      '| URI / Template | Scope | Mime | Description |',
+      '|---|---|---|---|',
+    );
     for (const r of resources) {
       const uriStr = r.uri ?? r.template ?? '';
-      lines.push(`| \`${uriStr}\` | \`${r.scope ?? 'homemcp:read'}\` | \`${r.mimeType}\` | ${r.description} |`);
+      lines.push(
+        `| \`${uriStr}\` | \`${r.scope ?? 'homemcp:read'}\` | \`${r.mimeType}\` | ${r.description} |`,
+      );
     }
 
     lines.push('', '## Prompts', '', '| Name | Title | Description |', '|---|---|---|');
@@ -68,7 +75,9 @@ function main(): void {
 
     const outPath = path.resolve(process.cwd(), 'docs/tools.md');
     writeFileSync(outPath, lines.join('\n'), 'utf8');
-    process.stdout.write(`Generated ${outPath} (${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts)\n`);
+    process.stdout.write(
+      `Generated ${outPath} (${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts)\n`,
+    );
   } finally {
     deps.db.close();
   }

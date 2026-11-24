@@ -102,7 +102,9 @@ describe('P1 Gateway MCP server (mock mode)', () => {
     // U1: overview & docker_list_services incl. dormant stacks
     const overview = await callTool('homemcp_overview');
     expect(overview.isError).toBeFalsy();
-    expect((overview.structuredContent['containers'] as { running: number }).running).toBeGreaterThanOrEqual(5);
+    expect(
+      (overview.structuredContent['containers'] as { running: number }).running,
+    ).toBeGreaterThanOrEqual(5);
 
     const listSvc = await callTool('docker_list_services');
     const dormant = listSvc.structuredContent['dormant_stacks'] as Array<{ name: string }>;
@@ -112,7 +114,9 @@ describe('P1 Gateway MCP server (mock mode)', () => {
     const naviProfile = await callTool('docker_service_profile', { name: 'navidrome' });
     expect(naviProfile.isError).toBeFalsy();
 
-    const cfProfile = await callTool('docker_service_profile', { name: 'cloudflared-cloudflared-1' });
+    const cfProfile = await callTool('docker_service_profile', {
+      name: 'cloudflared-cloudflared-1',
+    });
     const cfLogs = await callTool('docker_logs', { name: 'cloudflared-cloudflared-1' });
     const cfSerialized = JSON.stringify(cfProfile) + JSON.stringify(cfLogs);
     expect(cfSerialized).not.toContain('eyJhIjoi');
@@ -123,9 +127,12 @@ describe('P1 Gateway MCP server (mock mode)', () => {
     expect(health.structuredContent['reboot_required']).toBe(false);
 
     const disks = await callTool('system_disks');
-    const hdd = (disks.structuredContent['filesystems'] as Array<{ mountpoint: string; days_until_full?: number }>).find(
-      (f) => f.mountpoint === '/mnt/storage',
-    );
+    const hdd = (
+      disks.structuredContent['filesystems'] as Array<{
+        mountpoint: string;
+        days_until_full?: number;
+      }>
+    ).find((f) => f.mountpoint === '/mnt/storage');
     expect(hdd?.days_until_full).toBeGreaterThan(0);
 
     const smart = await callTool('system_smart_details', { device: 'sda' });

@@ -9,7 +9,12 @@ import {
   MockNtfyConnector,
 } from '@homemcp/mock';
 import { Redactor } from '@homemcp/core';
-import { createDefaultMockConfig, createGatewayDeps, buildMcpServer, type GatewayDeps } from '../src/server/factory.js';
+import {
+  createDefaultMockConfig,
+  createGatewayDeps,
+  buildMcpServer,
+  type GatewayDeps,
+} from '../src/server/factory.js';
 import { HomemcpDb } from '../src/db/database.js';
 import { AlertWatcher } from '../src/watcher/watcher.js';
 
@@ -84,10 +89,16 @@ describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
     expect(jfHealth.structuredContent['active_transcodes']).toBe(1);
 
     const jfProblems = await client.callTool('jellyfin_find_problems', { limit: 50 });
-    expect((jfProblems.structuredContent['unidentified'] as unknown[]).length).toBeGreaterThanOrEqual(1);
-    expect((jfProblems.structuredContent['naming_issues'] as unknown[]).length).toBeGreaterThanOrEqual(1);
+    expect(
+      (jfProblems.structuredContent['unidentified'] as unknown[]).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      (jfProblems.structuredContent['naming_issues'] as unknown[]).length,
+    ).toBeGreaterThanOrEqual(1);
 
-    const jfRunTask = await client.callTool('jellyfin_run_task', { task_id_or_name: 'Scan Media Library' });
+    const jfRunTask = await client.callTool('jellyfin_run_task', {
+      task_id_or_name: 'Scan Media Library',
+    });
     expect(jfRunTask.structuredContent['triggered']).toBe(true);
 
     // Downloads: valid add succeeds, huge min_free_bytes denied with CONFLICT

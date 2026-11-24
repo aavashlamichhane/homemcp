@@ -8,7 +8,10 @@ import { Redactor } from '../src/redact.js';
 
 describe('config loader', () => {
   it('validates examples/homemcp.config.example.yaml and registers env secrets in Redactor', async () => {
-    const examplePath = path.resolve(import.meta.dirname, '../../../examples/homemcp.config.example.yaml');
+    const examplePath = path.resolve(
+      import.meta.dirname,
+      '../../../examples/homemcp.config.example.yaml',
+    );
     const rawYaml = parseYaml(await readFile(examplePath, 'utf8'));
     const redactor = new Redactor();
 
@@ -45,7 +48,11 @@ describe('config loader', () => {
       parseConfigObject(
         {
           server: { publicUrl: 'https://homemcp.example.com' },
-          auth: { issuer: 'https://homemcp.example.com', owner: { name: 'Owner' }, secretKey: 'env:MISSING_KEY_XYZ' },
+          auth: {
+            issuer: 'https://homemcp.example.com',
+            owner: { name: 'Owner' },
+            secretKey: 'env:MISSING_KEY_XYZ',
+          },
           agent: { hmacSecret: 'env:HMAC_KEY' },
           policy: { roots: { stacks: '/srv/stacks', media: '/srv/media' } },
           modules: {},
@@ -58,7 +65,11 @@ describe('config loader', () => {
       parseConfigObject(
         {
           server: { publicUrl: 'https://homemcp.example.com' },
-          auth: { issuer: 'https://homemcp.example.com', owner: { name: 'Owner' }, secretKey: 'env:MISSING_KEY_XYZ' },
+          auth: {
+            issuer: 'https://homemcp.example.com',
+            owner: { name: 'Owner' },
+            secretKey: 'env:MISSING_KEY_XYZ',
+          },
           agent: { hmacSecret: 'env:HMAC_KEY' },
           policy: { roots: { stacks: '/srv/stacks', media: '/srv/media' } },
           modules: {},
@@ -68,6 +79,30 @@ describe('config loader', () => {
     } catch (err) {
       expect((err as Error).message).toContain('MISSING_KEY_XYZ');
       expect((err as Error).message).not.toContain('do-not-leak-this-secret');
+    }
+  });
+
+  it('throws ConfigError on env var containing newline characters without leaking the value', () => {
+    try {
+      parseConfigObject(
+        {
+          server: { publicUrl: 'https://homemcp.example.com' },
+          auth: {
+            issuer: 'https://homemcp.example.com',
+            owner: { name: 'Owner' },
+            secretKey: 'env:NEWLINE_SECRET',
+          },
+          agent: { hmacSecret: 'env:HMAC_KEY' },
+          policy: { roots: { stacks: '/srv/stacks', media: '/srv/media' } },
+          modules: {},
+        },
+        { NEWLINE_SECRET: '\nshould-not-leak-secret', HMAC_KEY: 'secret' },
+      );
+      expect.fail('Expected ConfigError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ConfigError);
+      expect((err as Error).message).toContain('NEWLINE_SECRET');
+      expect((err as Error).message).not.toContain('should-not-leak-secret');
     }
   });
 

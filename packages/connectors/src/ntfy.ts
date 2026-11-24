@@ -25,8 +25,8 @@ export class HttpNtfyConnector implements NtfyConnector {
 
   public async send(msg: NtfyMessage): Promise<void> {
     const headers: Record<string, string> = {
-      'Title': msg.title,
-      'Priority': String(msg.priority ?? 3),
+      Title: msg.title,
+      Priority: String(msg.priority ?? 3),
     };
     if (msg.tags && msg.tags.length > 0) {
       headers['Tags'] = msg.tags.join(',');

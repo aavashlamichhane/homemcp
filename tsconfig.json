@@ -3,10 +3,5 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": [
-    "vitest.config.ts",
-    "scripts/**/*.ts",
-    "evals/**/*.ts",
-    "packages/*/test/**/*.ts"
-  ]
+  "include": ["vitest.config.ts", "scripts/**/*.ts", "evals/**/*.ts", "packages/*/test/**/*.ts"]
 }

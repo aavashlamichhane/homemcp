@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { fetchCimdMetadata } from '../src/auth/cimd.js';
 import { startHttpGateway, type HttpGatewayHandle } from '../src/auth/http-server.js';
 import { isIpAllowedByCidrs } from '../src/auth/pats.js';
-import { createDefaultMockConfig, createGatewayDeps, type GatewayDeps } from '../src/server/factory.js';
+import {
+  createDefaultMockConfig,
+  createGatewayDeps,
+  type GatewayDeps,
+} from '../src/server/factory.js';
 
 function pkcePair(): { verifier: string; challenge: string } {
   const verifier = randomBytes(32).toString('base64url');
@@ -152,7 +156,10 @@ describe('Phase 2 Auth & HTTP Gateway E2E', () => {
     expect(step1.status).toBe(303);
     const loginLoc = new URL(step1.headers.get('location')!, baseUrl);
 
-    const loginPage = await fetch(loginLoc, { headers: { cookie: jar.header() }, redirect: 'manual' });
+    const loginPage = await fetch(loginLoc, {
+      headers: { cookie: jar.header() },
+      redirect: 'manual',
+    });
     jar.capture(loginPage);
     expect(loginPage.status).toBe(200);
 
@@ -322,5 +329,13 @@ describe('Phase 2 Auth & HTTP Gateway E2E', () => {
       body: JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} }),
     });
     expect(patRevoked.status).toBe(401);
+
+    // 9. Bootstrap UI sets strict CSP that still permits same-origin fetch()
+    const bootPage = await fetch(`${baseUrl}/account/bootstrap?token=dummy`);
+    expect(bootPage.status).toBe(200);
+    const csp = bootPage.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("connect-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
   });
 });

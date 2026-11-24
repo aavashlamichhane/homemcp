@@ -130,7 +130,10 @@ export function registerAuthModule(
     }),
     handler: (args) => {
       if (!opts?.patManager) {
-        throw new HomemcpError('UPSTREAM_UNAVAILABLE', 'PAT manager is only available in HTTP auth mode');
+        throw new HomemcpError(
+          'UPSTREAM_UNAVAILABLE',
+          'PAT manager is only available in HTTP auth mode',
+        );
       }
       const { record, revealId } = opts.patManager.createPat({
         name: args.name,
@@ -188,8 +191,7 @@ export function registerAuthModule(
     name: 'auth_pat_revoke',
     toolset: 'auth',
     tier: 'T2',
-    description:
-      'Revokes a Personal Access Token by id. Example: auth_pat_revoke({ id: "..." }).',
+    description: 'Revokes a Personal Access Token by id. Example: auth_pat_revoke({ id: "..." }).',
     annotations: {
       title: 'Revoke Personal Access Token',
       readOnlyHint: false,

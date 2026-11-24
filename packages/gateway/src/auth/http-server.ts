@@ -114,7 +114,11 @@ export async function startHttpGateway(
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],
-        token_endpoint_auth_methods_supported: ['none', 'client_secret_basic', 'client_secret_post'],
+        token_endpoint_auth_methods_supported: [
+          'none',
+          'client_secret_basic',
+          'client_secret_post',
+        ],
         scopes_supported: ['openid', ...ALL_SCOPES],
         client_id_metadata_document_supported: deps.config.auth.clientRegistration.cimd,
       },
@@ -150,7 +154,8 @@ export async function startHttpGateway(
   });
 
   const mcpHandler = (toolsetsParam?: string) => async (req: Request, res: Response) => {
-    const authInfo = (req as Request & { auth?: AuthContext & { extra?: Record<string, unknown> } }).auth;
+    const authInfo = (req as Request & { auth?: AuthContext & { extra?: Record<string, unknown> } })
+      .auth;
     const extra = authInfo?.extra ?? {};
     const auth: AuthContext | undefined = authInfo
       ? {
@@ -174,11 +179,15 @@ export async function startHttpGateway(
 
   app.post('/mcp', bearerAuth, (req, res) => void mcpHandler(undefined)(req, res));
   app.delete('/mcp', bearerAuth, (req, res) => void mcpHandler(undefined)(req, res));
-  app.post('/mcp/:toolsets', bearerAuth, (req, res) =>
-    void mcpHandler(String(req.params['toolsets']))(req, res),
+  app.post(
+    '/mcp/:toolsets',
+    bearerAuth,
+    (req, res) => void mcpHandler(String(req.params['toolsets']))(req, res),
   );
-  app.delete('/mcp/:toolsets', bearerAuth, (req, res) =>
-    void mcpHandler(String(req.params['toolsets']))(req, res),
+  app.delete(
+    '/mcp/:toolsets',
+    bearerAuth,
+    (req, res) => void mcpHandler(String(req.params['toolsets']))(req, res),
   );
 
   // Interactive login/consent/account/bootstrap/confirm UI

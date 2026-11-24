@@ -30,17 +30,20 @@ export interface NaviloadConnector {
   health(): Promise<Record<string, unknown>>;
   searchYoutube(query: string, limit?: number): Promise<NaviloadSearchCandidate[]>;
   inspectUrl(url: string): Promise<Record<string, unknown>>;
-  downloadTracks(opts: {
-    urls: readonly string[];
-    quality?: string | undefined;
-  }): Promise<{ job_id?: string | undefined; queued: number; items: Array<Record<string, unknown>> }>;
+  downloadTracks(opts: { urls: readonly string[]; quality?: string | undefined }): Promise<{
+    job_id?: string | undefined;
+    queued: number;
+    items: Array<Record<string, unknown>>;
+  }>;
   getStatus(): Promise<{ tracks: NaviloadTrack[]; queue_depth?: number | undefined }>;
   getLibrary(): Promise<Array<Record<string, unknown>>>;
   reviewTrack(opts: {
     trackId: string;
     policy: 'keep_youtube' | 'suggestion' | 'manual';
     suggestionIndex?: number | undefined;
-    manualTags?: { title?: string | undefined; artist?: string | undefined; album?: string | undefined } | undefined;
+    manualTags?:
+      | { title?: string | undefined; artist?: string | undefined; album?: string | undefined }
+      | undefined;
     artworkPolicy?: 'db_then_youtube' | 'youtube' | undefined;
   }): Promise<Record<string, unknown>>;
   confirmTrack(trackId: string): Promise<Record<string, unknown>>;
@@ -90,36 +93,54 @@ export class HttpNaviloadConnector implements NaviloadConnector {
   }
 
   public downloadTracks(opts: { urls: readonly string[]; quality?: string | undefined }) {
-    return fetchJson<{ job_id?: string | undefined; queued: number; items: Array<Record<string, unknown>> }>(
-      `${this.baseUrl}/api/download`,
-      {
-        method: 'POST',
-        headers: this.headers(),
-        body: JSON.stringify({ urls: opts.urls, ...(opts.quality ? { quality: opts.quality } : {}) }),
-        serviceName: 'naviload',
-      },
-    );
+    return fetchJson<{
+      job_id?: string | undefined;
+      queued: number;
+      items: Array<Record<string, unknown>>;
+    }>(`${this.baseUrl}/api/download`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ urls: opts.urls, ...(opts.quality ? { quality: opts.quality } : {}) }),
+      serviceName: 'naviload',
+    });
   }
 
-  public getStatus(): Promise<{ tracks: NaviloadTrack[]; queue_depth?: number | undefined }> {
-    return fetchJson<{ tracks: NaviloadTrack[]; queue_depth?: number | undefined }>(
-      `${this.baseUrl}/api/status`,
-      { headers: this.headers(), serviceName: 'naviload' },
-    );
+  public async getStatus(): Promise<{ tracks: NaviloadTrack[]; queue_depth?: number | undefined }> {
+    const res = await fetchJson<{
+      tracks?: Array<NaviloadTrack & { candidates?: Array<Record<string, unknown>> | undefined }>;
+      history?: Array<NaviloadTrack & { candidates?: Array<Record<string, unknown>> | undefined }>;
+      queue_depth?: number | undefined;
+    }>(`${this.baseUrl}/api/status`, { headers: this.headers(), serviceName: 'naviload' });
+    const rawTracks = [...(res.tracks ?? []), ...(res.history ?? [])];
+    const tracks: NaviloadTrack[] = rawTracks.map((t) => {
+      if (t.suggestions !== undefined || !Array.isArray(t.candidates)) {
+        return t;
+      }
+      return { ...t, suggestions: t.candidates };
+    });
+    return {
+      tracks,
+      queue_depth: res.queue_depth ?? (res.tracks ? res.tracks.length : 0),
+    };
   }
 
-  public getLibrary(): Promise<Array<Record<string, unknown>>> {
-    return fetchJson<Array<Record<string, unknown>>>(`${this.baseUrl}/api/library`, {
+  public async getLibrary(): Promise<Array<Record<string, unknown>>> {
+    const res = await fetchJson<
+      Array<Record<string, unknown>> | { items?: Array<Record<string, unknown>> }
+    >(`${this.baseUrl}/api/library`, {
       headers: this.headers(),
       serviceName: 'naviload',
     });
+    return Array.isArray(res) ? res : (res.items ?? []);
   }
 
   public reviewTrack(opts: {
     trackId: string;
     policy: 'keep_youtube' | 'suggestion' | 'manual';
     suggestionIndex?: number | undefined;
-    manualTags?: { title?: string | undefined; artist?: string | undefined; album?: string | undefined } | undefined;
+    manualTags?:
+      | { title?: string | undefined; artist?: string | undefined; album?: string | undefined }
+      | undefined;
     artworkPolicy?: 'db_then_youtube' | 'youtube' | undefined;
   }): Promise<Record<string, unknown>> {
     return fetchJson<Record<string, unknown>>(

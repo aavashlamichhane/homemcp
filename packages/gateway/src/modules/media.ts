@@ -45,7 +45,9 @@ export function registerMediaModule(deps: GatewayDeps): void {
         jf.getLibraries(),
       ]);
       const transcodes = sessions.filter(
-        (s) => s.PlayState?.PlayMethod === 'Transcode' || Boolean(s.TranscodingInfo && !s.TranscodingInfo.IsVideoDirect),
+        (s) =>
+          s.PlayState?.PlayMethod === 'Transcode' ||
+          Boolean(s.TranscodingInfo && !s.TranscodingInfo.IsVideoDirect),
       );
       const failedTasks = tasks
         .filter((t) => t.LastExecutionResult?.Status === 'Failed')
@@ -70,7 +72,8 @@ export function registerMediaModule(deps: GatewayDeps): void {
     name: 'jellyfin_sessions',
     toolset: 'media',
     tier: 'T0',
-    description: 'Lists active Jellyfin playback sessions including codec, hardware acceleration, and transcode reasons. Read-only.',
+    description:
+      'Lists active Jellyfin playback sessions including codec, hardware acceleration, and transcode reasons. Read-only.',
     annotations: {
       title: 'Jellyfin Sessions',
       readOnlyHint: true,
@@ -231,7 +234,12 @@ export function registerMediaModule(deps: GatewayDeps): void {
           missingImages.push({ id: item.Id, name: item.Name, type: item.Type });
         }
         if (item.Type === 'Movie' && item.Path && !/\(\d{4}\)/.test(item.Path)) {
-          namingIssues.push({ id: item.Id, name: item.Name, path: item.Path, issue: 'Missing (Year) in movie filename/dir' });
+          namingIssues.push({
+            id: item.Id,
+            name: item.Name,
+            path: item.Path,
+            issue: 'Missing (Year) in movie filename/dir',
+          });
         }
       }
 
@@ -251,7 +259,8 @@ export function registerMediaModule(deps: GatewayDeps): void {
     name: 'jellyfin_activity_log',
     toolset: 'media',
     tier: 'T0',
-    description: 'Returns recent Jellyfin authentication and admin activity log entries. Read-only.',
+    description:
+      'Returns recent Jellyfin authentication and admin activity log entries. Read-only.',
     annotations: {
       title: 'Jellyfin Activity Log',
       readOnlyHint: true,
@@ -327,7 +336,8 @@ export function registerMediaModule(deps: GatewayDeps): void {
     name: 'jellyfin_run_task',
     toolset: 'media',
     tier: 'T1',
-    description: 'Triggers a Jellyfin scheduled task by ID or exact task name (e.g., Scan Media Library).',
+    description:
+      'Triggers a Jellyfin scheduled task by ID or exact task name (e.g., Scan Media Library).',
     annotations: {
       title: 'Run Jellyfin Task',
       readOnlyHint: false,

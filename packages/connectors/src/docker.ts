@@ -201,7 +201,12 @@ export class HttpDockerConnector implements DockerConnector {
           ? { PidsLimit: hostConfig['PidsLimit'] as number | null }
           : {}),
         ...(hostConfig['LogConfig']
-          ? { LogConfig: hostConfig['LogConfig'] as { Type: string; Config: Record<string, string> } }
+          ? {
+              LogConfig: hostConfig['LogConfig'] as {
+                Type: string;
+                Config: Record<string, string>;
+              },
+            }
           : {}),
       },
     };

@@ -44,7 +44,12 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
       }
       if (req.url?.startsWith('/Items')) {
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ Items: [{ Id: 'm1', Name: 'Movie One', Type: 'Movie' }], TotalRecordCount: 1 }));
+        res.end(
+          JSON.stringify({
+            Items: [{ Id: 'm1', Name: 'Movie One', Type: 'Movie' }],
+            TotalRecordCount: 1,
+          }),
+        );
         return;
       }
       res.writeHead(404);
@@ -76,7 +81,15 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
       }
       if (req.url === '/api/v2/transfer/info') {
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ dl_info_speed: 1024, up_info_speed: 512, dl_info_data: 0, up_info_data: 0, connection_status: 'connected' }));
+        res.end(
+          JSON.stringify({
+            dl_info_speed: 1024,
+            up_info_speed: 512,
+            dl_info_data: 0,
+            up_info_data: 0,
+            connection_status: 'connected',
+          }),
+        );
         return;
       }
       if (req.url?.startsWith('/api/v2/torrents/info')) {
@@ -88,7 +101,11 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
       res.end('Ok.');
     });
 
-    const qb = new HttpQbittorrentConnector({ url, user: 'admin', password: 'qb-password-fixture' });
+    const qb = new HttpQbittorrentConnector({
+      url,
+      user: 'admin',
+      password: 'qb-password-fixture',
+    });
     const info = await qb.getTransferInfo();
     expect(info.dl_info_speed).toBe(1024);
     await qb.addTorrent({ urls: ['magnet:?xt=urn:btih:0123456789'], category: 'movies' });
@@ -116,7 +133,12 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
     });
 
     const ntfy = new HttpNtfyConnector({ url: `${url}/alerts`, token: 'ntfy-tok-fixture' });
-    await ntfy.send({ title: 'Test Alert', message: 'Disk ok', priority: 3, tags: ['white_check_mark'] });
+    await ntfy.send({
+      title: 'Test Alert',
+      message: 'Disk ok',
+      priority: 3,
+      tags: ['white_check_mark'],
+    });
 
     const hc = new HttpHealthchecksConnector({ pingUrl: `${url}/hc/uuid-1` });
     expect(await hc.ping('start')).toBe(true);

@@ -28,7 +28,10 @@ export function registerOpsWriteVerbs(
     name: 'docker.container_action',
     inputSchema: z
       .object({
-        name: z.string().min(1).regex(/^[A-Za-z0-9_.-]+$/),
+        name: z
+          .string()
+          .min(1)
+          .regex(/^[A-Za-z0-9_.-]+$/),
         action: z.enum(['start', 'stop', 'restart']),
         override_protected: z.boolean().default(false),
       })
@@ -79,15 +82,17 @@ export function registerOpsWriteVerbs(
         }
       }
       if (!safeDir) {
-        throw new HomemcpError('POLICY_DENIED', `stack_dir outside allowed stack roots: ${stack_dir}`);
+        throw new HomemcpError(
+          'POLICY_DENIED',
+          `stack_dir outside allowed stack roots: ${stack_dir}`,
+        );
       }
 
       // Snapshot prior digests for rollback
-      const psIds = await opts.runner.run(
-        '/usr/bin/docker',
-        ['compose', 'ps', '-q', service],
-        { cwd: safeDir, allowNonZero: true },
-      );
+      const psIds = await opts.runner.run('/usr/bin/docker', ['compose', 'ps', '-q', service], {
+        cwd: safeDir,
+        allowNonZero: true,
+      });
       const prevDigests: Record<string, string> = {};
       for (const cid of psIds.stdout.split(/\s+/).filter(Boolean)) {
         const insp = await opts.runner.run(
@@ -124,7 +129,11 @@ export function registerOpsWriteVerbs(
           healthy = true;
           break;
         }
-        if (lastState.includes('exited') || lastState.includes('dead') || lastState.includes('unhealthy')) {
+        if (
+          lastState.includes('exited') ||
+          lastState.includes('dead') ||
+          lastState.includes('unhealthy')
+        ) {
           break;
         }
         await new Promise((r) => setTimeout(r, 3000));
@@ -182,11 +191,17 @@ export function registerOpsWriteVerbs(
         };
       }
       const outs: string[] = [];
-      outs.push((await opts.runner.run('/usr/bin/docker', ['container', 'prune', '-f'])).stdout.trim());
+      outs.push(
+        (await opts.runner.run('/usr/bin/docker', ['container', 'prune', '-f'])).stdout.trim(),
+      );
       outs.push((await opts.runner.run('/usr/bin/docker', ['image', 'prune', '-f'])).stdout.trim());
-      outs.push((await opts.runner.run('/usr/bin/docker', ['network', 'prune', '-f'])).stdout.trim());
+      outs.push(
+        (await opts.runner.run('/usr/bin/docker', ['network', 'prune', '-f'])).stdout.trim(),
+      );
       if (include_build_cache) {
-        outs.push((await opts.runner.run('/usr/bin/docker', ['builder', 'prune', '-f'])).stdout.trim());
+        outs.push(
+          (await opts.runner.run('/usr/bin/docker', ['builder', 'prune', '-f'])).stdout.trim(),
+        );
       }
       return {
         applied: true,

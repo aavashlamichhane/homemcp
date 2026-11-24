@@ -17,10 +17,11 @@ export async function loadOrCreateSigningKeys(
   secretKey: string,
 ): Promise<{ publicJwk: JWK; privateJwk: JWK }> {
   const existing = db.db
-    .prepare('SELECT kid, alg, public_jwk_json, private_jwk_enc FROM auth_keys ORDER BY created_at ASC LIMIT 1')
+    .prepare(
+      'SELECT kid, alg, public_jwk_json, private_jwk_enc FROM auth_keys ORDER BY created_at ASC LIMIT 1',
+    )
     .get() as
-    | { kid: string; alg: string; public_jwk_json: string; private_jwk_enc: string }
-    | undefined;
+    { kid: string; alg: string; public_jwk_json: string; private_jwk_enc: string } | undefined;
 
   if (existing) {
     return {
@@ -52,7 +53,8 @@ export async function createOidcProvider(
 ): Promise<AuthProviderBundle> {
   const issuer = (opts?.issuerOverride ?? config.auth.issuer).replace(/\/+$/, '');
   const mcpResourceUrl = (
-    opts?.mcpResourceOverride ?? `${config.server.publicUrl.replace(/\/+$/, '')}${config.server.mcpPath}`
+    opts?.mcpResourceOverride ??
+    `${config.server.publicUrl.replace(/\/+$/, '')}${config.server.mcpPath}`
   ).replace(/\/+$/, '');
 
   const { publicJwk, privateJwk } = await loadOrCreateSigningKeys(db, config.auth.secretKey);

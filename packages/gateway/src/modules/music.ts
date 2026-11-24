@@ -39,7 +39,11 @@ interface StoredBuildPlaylistPlan {
 
 export async function reconcileWaitingMusicJobs(deps: GatewayDeps): Promise<number> {
   if (!deps.subsonic || !deps.naviload) return 0;
-  const waitingJobs = deps.jobs.listJobs({ status: 'waiting_user', kind: 'music_build_playlist', limit: 20 });
+  const waitingJobs = deps.jobs.listJobs({
+    status: 'waiting_user',
+    kind: 'music_build_playlist',
+    limit: 20,
+  });
   if (waitingJobs.length === 0) return 0;
 
   let updatedPlaylists = 0;
@@ -56,7 +60,9 @@ export async function reconcileWaitingMusicJobs(deps: GatewayDeps): Promise<numb
     for (const item of items) {
       if (item.state === 'playlist_added') continue;
       const trk = nlStatus.tracks.find(
-        (t) => (item.naviload_track_id && t.id === item.naviload_track_id) || t.video_id === item.video_id,
+        (t) =>
+          (item.naviload_track_id && t.id === item.naviload_track_id) ||
+          t.video_id === item.video_id,
       );
       if (!trk) {
         pendingCount++;
@@ -73,7 +79,11 @@ export async function reconcileWaitingMusicJobs(deps: GatewayDeps): Promise<numb
 
     if (anySavedNewly) {
       await deps.subsonic.startScan(false);
-      const searchRes = await deps.subsonic.search3('', { songCount: 500, albumCount: 0, artistCount: 0 });
+      const searchRes = await deps.subsonic.search3('', {
+        songCount: 500,
+        albumCount: 0,
+        artistCount: 0,
+      });
       const songIdsToAdd: string[] = [];
       let playlistId: string | undefined;
 
@@ -527,7 +537,10 @@ export function registerMusicModule(deps: GatewayDeps): void {
       const matches = matchRequestedTracks(args.tracks, library.songs);
 
       const matched = matches
-        .filter((m): m is typeof m & { track: NonNullable<typeof m.track> } => m.matched && Boolean(m.track))
+        .filter(
+          (m): m is typeof m & { track: NonNullable<typeof m.track> } =>
+            m.matched && Boolean(m.track),
+        )
         .map((m) => ({
           artist: m.track.artist,
           title: m.track.title,
@@ -642,8 +655,7 @@ export function registerMusicModule(deps: GatewayDeps): void {
     handler: async (args, ctx) => {
       const sub = requireSubsonic(deps);
       const row = deps.db.db.prepare('SELECT * FROM plans WHERE id = ?').get(args.plan_id) as
-        | { payload_json: string; status: string; expires_at: string }
-        | undefined;
+        { payload_json: string; status: string; expires_at: string } | undefined;
       if (!row) {
         throw new HomemcpError('NOT_FOUND', `Playlist plan not found: ${args.plan_id}`);
       }
@@ -685,47 +697,58 @@ export function registerMusicModule(deps: GatewayDeps): void {
       });
 
       const pendingTrackIds: string[] = [];
-      const job = deps.jobs.startBackground('music_build_playlist', ctx.auth.subject, async (jctx) => {
-        await jctx.addStep(`Created playlist "${playlist.name}" (${playlist.id}) with ${playlist.songCount} existing tracks`, 25);
-
-        for (let i = 0; i < selected.length; i++) {
-          const sel = selected[i]!;
-          const itemRec = dlRes.items[i];
-          const trackId = typeof itemRec?.['id'] === 'string' ? itemRec['id'] : undefined;
-          const trackState = typeof itemRec?.['status'] === 'string' ? itemRec['status'] : 'queued';
-          if (trackId && trackState === 'pending_review') {
-            pendingTrackIds.push(trackId);
-          }
-          deps.db.insertMusicJobItem({
-            jobId: jctx.jobId,
-            playlistId: playlist.id,
-            playlistName: playlist.name,
-            videoId: sel.video_id,
-            naviloadTrackId: trackId,
-            state: trackState,
-          });
-        }
-
-        const nlStatus = await deps.naviload!.getStatus();
-        const needsReview = nlStatus.tracks.filter(
-          (t) => selected.some((s) => s.video_id === t.video_id) && t.status === 'pending_review',
-        );
-        if (needsReview.length > 0) {
-          await jctx.setProgress(60, `Waiting for human metadata review on ${needsReview.length} tracks via naviload_review_list`);
-          jctx.markWaitingUser(
-            `Downloads staged in NaviLoad awaiting human review: ${needsReview.map((t) => t.id).join(', ')}`,
-            {
-              playlist_id: playlist.id,
-              pending_review_track_ids: needsReview.map((t) => t.id),
-            },
+      const job = deps.jobs.startBackground(
+        'music_build_playlist',
+        ctx.auth.subject,
+        async (jctx) => {
+          await jctx.addStep(
+            `Created playlist "${playlist.name}" (${playlist.id}) with ${playlist.songCount} existing tracks`,
+            25,
           );
-          return;
-        }
 
-        await sub.startScan(false);
-        await jctx.setProgress(100, 'Navidrome scan triggered');
-        return { playlist_id: playlist.id };
-      });
+          for (let i = 0; i < selected.length; i++) {
+            const sel = selected[i]!;
+            const itemRec = dlRes.items[i];
+            const trackId = typeof itemRec?.['id'] === 'string' ? itemRec['id'] : undefined;
+            const trackState =
+              typeof itemRec?.['status'] === 'string' ? itemRec['status'] : 'queued';
+            if (trackId && trackState === 'pending_review') {
+              pendingTrackIds.push(trackId);
+            }
+            deps.db.insertMusicJobItem({
+              jobId: jctx.jobId,
+              playlistId: playlist.id,
+              playlistName: playlist.name,
+              videoId: sel.video_id,
+              naviloadTrackId: trackId,
+              state: trackState,
+            });
+          }
+
+          const nlStatus = await deps.naviload!.getStatus();
+          const needsReview = nlStatus.tracks.filter(
+            (t) => selected.some((s) => s.video_id === t.video_id) && t.status === 'pending_review',
+          );
+          if (needsReview.length > 0) {
+            await jctx.setProgress(
+              60,
+              `Waiting for human metadata review on ${needsReview.length} tracks via naviload_review_list`,
+            );
+            jctx.markWaitingUser(
+              `Downloads staged in NaviLoad awaiting human review: ${needsReview.map((t) => t.id).join(', ')}`,
+              {
+                playlist_id: playlist.id,
+                pending_review_track_ids: needsReview.map((t) => t.id),
+              },
+            );
+            return;
+          }
+
+          await sub.startScan(false);
+          await jctx.setProgress(100, 'Navidrome scan triggered');
+          return { playlist_id: playlist.id };
+        },
+      );
 
       await deps.jobs.waitForJob(job.id);
       const latestJob = deps.jobs.getJob(job.id)!;
@@ -759,7 +782,9 @@ export function registerMusicModule(deps: GatewayDeps): void {
       idempotentHint: false,
       openWorldHint: false,
     },
-    inputSchema: z.object({ playlist_id: z.string().min(1), plan_id: z.string().optional() }).strict(),
+    inputSchema: z
+      .object({ playlist_id: z.string().min(1), plan_id: z.string().optional() })
+      .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       const sub = requireSubsonic(deps);
@@ -852,7 +877,10 @@ export function registerMusicModule(deps: GatewayDeps): void {
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args) => {
       if (!args.all && !args.any) {
-        throw new HomemcpError('INVALID_ARGUMENT', 'Smart playlist requires at least "all" or "any" rule array');
+        throw new HomemcpError(
+          'INVALID_ARGUMENT',
+          'Smart playlist requires at least "all" or "any" rule array',
+        );
       }
       const nspDoc = {
         name: args.name,

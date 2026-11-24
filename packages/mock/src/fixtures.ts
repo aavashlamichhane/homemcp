@@ -47,7 +47,12 @@ export interface MockState {
   cfTunnelConfig: CloudflareTunnelConfig;
   cfDnsRecords: CloudflareDnsRecord[];
   cfAccessApps: CloudflareAccessApp[];
-  cfConnections: Array<{ id: string; origin_ip: string; client_version: string; opened_at: string }>;
+  cfConnections: Array<{
+    id: string;
+    origin_ip: string;
+    client_version: string;
+    opened_at: string;
+  }>;
   backupStatus: Record<string, unknown>;
   backupSnapshots: Array<Record<string, unknown>>;
   backupStats: Record<string, unknown>;
@@ -143,11 +148,14 @@ export function createMockState(): MockState {
         Labels: {
           'com.docker.compose.project': 'vaultwarden-server',
           'com.docker.compose.service': 'vaultwarden',
-          'com.docker.compose.project.working_dir': '/home/homelab/docker-containers/vaultwarden-server',
+          'com.docker.compose.project.working_dir':
+            '/home/homelab/docker-containers/vaultwarden-server',
           'org.opencontainers.image.version': '1.37.0',
         },
         Ports: [{ IP: '192.0.2.10', PrivatePort: 80, PublicPort: 8082, Type: 'tcp' }],
-        NetworkSettings: { Networks: { 'vaultwarden-server_default': { IPAddress: '172.24.0.2' } } },
+        NetworkSettings: {
+          Networks: { 'vaultwarden-server_default': { IPAddress: '172.24.0.2' } },
+        },
       },
       {
         Id: 'c-cloudflared-1',
@@ -213,7 +221,12 @@ export function createMockState(): MockState {
           },
         },
         Mounts: [
-          { Type: 'bind', Source: '/home/homelab/docker-containers/navidrome/navidrome-data', Destination: '/data', RW: true },
+          {
+            Type: 'bind',
+            Source: '/home/homelab/docker-containers/navidrome/navidrome-data',
+            Destination: '/data',
+            RW: true,
+          },
           { Type: 'bind', Source: '/mnt/storage/media/music', Destination: '/music', RW: false },
         ],
         Networks: ['navidrome_default'],
@@ -245,7 +258,9 @@ export function createMockState(): MockState {
           EnvKeys: ['DOMAIN', 'SIGNUPS_ALLOWED'],
           Labels: { 'org.opencontainers.image.version': '1.37.0' },
         },
-        Mounts: [{ Type: 'bind', Source: '/mnt/storage/vaultwarden/data', Destination: '/data', RW: true }],
+        Mounts: [
+          { Type: 'bind', Source: '/mnt/storage/vaultwarden/data', Destination: '/data', RW: true },
+        ],
         Networks: ['vaultwarden-server_default'],
         Ports: { '80/tcp': [{ HostIp: '192.0.2.10', HostPort: '8082' }] },
         HostConfig: {
@@ -401,18 +416,63 @@ export function createMockState(): MockState {
       },
     },
     cfDnsRecords: [
-      { id: 'd1', zone_id: 'z1', zone_name: 'example.com', name: 'navidrome.example.com', type: 'CNAME', content: 'tun-mock.cfargotunnel.com', proxied: true },
-      { id: 'd2', zone_id: 'z1', zone_name: 'example.com', name: 'vw.example.com', type: 'CNAME', content: 'tun-mock.cfargotunnel.com', proxied: true },
-      { id: 'd3', zone_id: 'z1', zone_name: 'example.com', name: 'stale-dead.example.com', type: 'CNAME', content: 'tun-mock.cfargotunnel.com', proxied: true },
-      { id: 'd4', zone_id: 'z1', zone_name: 'example.com', name: 'homemcp.example.com', type: 'CNAME', content: 'tun-mock.cfargotunnel.com', proxied: true },
+      {
+        id: 'd1',
+        zone_id: 'z1',
+        zone_name: 'example.com',
+        name: 'navidrome.example.com',
+        type: 'CNAME',
+        content: 'tun-mock.cfargotunnel.com',
+        proxied: true,
+      },
+      {
+        id: 'd2',
+        zone_id: 'z1',
+        zone_name: 'example.com',
+        name: 'vw.example.com',
+        type: 'CNAME',
+        content: 'tun-mock.cfargotunnel.com',
+        proxied: true,
+      },
+      {
+        id: 'd3',
+        zone_id: 'z1',
+        zone_name: 'example.com',
+        name: 'stale-dead.example.com',
+        type: 'CNAME',
+        content: 'tun-mock.cfargotunnel.com',
+        proxied: true,
+      },
+      {
+        id: 'd4',
+        zone_id: 'z1',
+        zone_name: 'example.com',
+        name: 'homemcp.example.com',
+        type: 'CNAME',
+        content: 'tun-mock.cfargotunnel.com',
+        proxied: true,
+      },
     ],
-    cfAccessApps: [
-      { id: 'a1', name: 'SSH', domain: 'ssh.example.com', type: 'self_hosted' },
-    ],
+    cfAccessApps: [{ id: 'a1', name: 'SSH', domain: 'ssh.example.com', type: 'self_hosted' }],
     cfConnections: [
-      { id: 'conn-1', origin_ip: '198.51.100.1', client_version: '2026.5.2', opened_at: '2026-11-24T00:00:00Z' },
-      { id: 'conn-2', origin_ip: '198.51.100.1', client_version: '2026.5.2', opened_at: '2026-11-24T00:00:00Z' },
-      { id: 'conn-3', origin_ip: '198.51.100.1', client_version: '2026.5.2', opened_at: '2026-11-24T00:00:00Z' },
+      {
+        id: 'conn-1',
+        origin_ip: '198.51.100.1',
+        client_version: '2026.5.2',
+        opened_at: '2026-11-24T00:00:00Z',
+      },
+      {
+        id: 'conn-2',
+        origin_ip: '198.51.100.1',
+        client_version: '2026.5.2',
+        opened_at: '2026-11-24T00:00:00Z',
+      },
+      {
+        id: 'conn-3',
+        origin_ip: '198.51.100.1',
+        client_version: '2026.5.2',
+        opened_at: '2026-11-24T00:00:00Z',
+      },
     ],
     backupStatus: {
       vaultwarden: {
@@ -435,8 +495,18 @@ export function createMockState(): MockState {
       },
     },
     backupSnapshots: [
-      { id: 'a1b2c3d4', time: new Date(Date.now() - 2 * 3600_000).toISOString(), tags: ['set=vaultwarden'], paths: ['/var/lib/homemcp/backup/staging/vaultwarden'] },
-      { id: 'e5f60718', time: new Date(Date.now() - 6 * 3600_000).toISOString(), tags: ['set=configs'], paths: ['/home/homelab/docker-containers'] },
+      {
+        id: 'a1b2c3d4',
+        time: new Date(Date.now() - 2 * 3600_000).toISOString(),
+        tags: ['set=vaultwarden'],
+        paths: ['/var/lib/homemcp/backup/staging/vaultwarden'],
+      },
+      {
+        id: 'e5f60718',
+        time: new Date(Date.now() - 6 * 3600_000).toISOString(),
+        tags: ['set=configs'],
+        paths: ['/home/homelab/docker-containers'],
+      },
     ],
     backupStats: { total_size: 1_250_000_000, total_file_count: 4200 },
     files: {
@@ -576,8 +646,22 @@ export function createMockState(): MockState {
       },
     ],
     jellyfinLibraries: [
-      { Name: 'Movies', CollectionType: 'movies', ItemId: 'lib-movies', Locations: ['/mnt/storage/media/jellyfin/movies'], RefreshProgress: 100, RefreshStatus: 'Idle' },
-      { Name: 'Series', CollectionType: 'tvshows', ItemId: 'lib-series', Locations: ['/mnt/storage/media/jellyfin/series'], RefreshProgress: 100, RefreshStatus: 'Idle' },
+      {
+        Name: 'Movies',
+        CollectionType: 'movies',
+        ItemId: 'lib-movies',
+        Locations: ['/mnt/storage/media/jellyfin/movies'],
+        RefreshProgress: 100,
+        RefreshStatus: 'Idle',
+      },
+      {
+        Name: 'Series',
+        CollectionType: 'tvshows',
+        ItemId: 'lib-series',
+        Locations: ['/mnt/storage/media/jellyfin/series'],
+        RefreshProgress: 100,
+        RefreshStatus: 'Idle',
+      },
     ],
     jellyfinItems: [
       {
@@ -614,7 +698,13 @@ export function createMockState(): MockState {
       },
     ],
     jellyfinActivity: [
-      { Id: 1, Name: 'AuthenticationSucceeded', UserId: 'u1', Date: new Date().toISOString(), Severity: 'Information' },
+      {
+        Id: 1,
+        Name: 'AuthenticationSucceeded',
+        UserId: 'u1',
+        Date: new Date().toISOString(),
+        Severity: 'Information',
+      },
     ],
     qbitTorrents: [
       {

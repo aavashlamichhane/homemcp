@@ -128,7 +128,10 @@ export class MockExecutor implements AgentExecutor {
 
       case 'system.smart_details':
         if (params['device'] !== 'sda') {
-          throw new HomemcpError('NOT_FOUND', `SMART report not found for device: ${String(params['device'])}`);
+          throw new HomemcpError(
+            'NOT_FOUND',
+            `SMART report not found for device: ${String(params['device'])}`,
+          );
         }
         return {
           device: 'sda',
@@ -138,8 +141,22 @@ export class MockExecutor implements AgentExecutor {
           temp_c: 36,
           power_on_hours: 14200,
           attributes: [
-            { id: 5, name: 'Reallocated_Sector_Ct', value: 100, worst: 100, thresh: 10, raw_value: 0 },
-            { id: 197, name: 'Current_Pending_Sector', value: 100, worst: 100, thresh: 0, raw_value: 0 },
+            {
+              id: 5,
+              name: 'Reallocated_Sector_Ct',
+              value: 100,
+              worst: 100,
+              thresh: 10,
+              raw_value: 0,
+            },
+            {
+              id: 197,
+              name: 'Current_Pending_Sector',
+              value: 100,
+              worst: 100,
+              thresh: 0,
+              raw_value: 0,
+            },
           ],
         };
 
@@ -253,7 +270,16 @@ export class MockExecutor implements AgentExecutor {
 
       case 'backup.run': {
         const set = typeof params['set'] === 'string' ? params['set'] : 'vaultwarden';
-        const allowed = ['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata', 'all'];
+        const allowed = [
+          'vaultwarden',
+          'configs',
+          'npm',
+          'navidrome',
+          'system',
+          'jellyfin',
+          'userdata',
+          'all',
+        ];
         if (!allowed.includes(set)) {
           throw new HomemcpError('INVALID_ARGUMENT', `Unknown backup set: ${set}`);
         }
@@ -281,9 +307,11 @@ export class MockExecutor implements AgentExecutor {
         return { exit_code: 0, output: 'restic check passed: no errors' };
 
       case 'backup.restore_test': {
-        const snapshotId = typeof params['snapshot_id'] === 'string' ? params['snapshot_id'] : 'latest';
+        const snapshotId =
+          typeof params['snapshot_id'] === 'string' ? params['snapshot_id'] : 'latest';
         const now = new Date().toISOString();
-        const prev = (this.state.backupStatus['vaultwarden'] as Record<string, unknown> | undefined) ?? {};
+        const prev =
+          (this.state.backupStatus['vaultwarden'] as Record<string, unknown> | undefined) ?? {};
         this.state.backupStatus['vaultwarden'] = {
           ...prev,
           last_restore_test: {
@@ -302,8 +330,12 @@ export class MockExecutor implements AgentExecutor {
 
       case 'backup.restore_staging': {
         const set = typeof params['set'] === 'string' ? params['set'] : 'vaultwarden';
-        const snapshotId = typeof params['snapshot_id'] === 'string' ? params['snapshot_id'] : 'latest';
-        const subdir = typeof params['staging_subdir'] === 'string' ? params['staging_subdir'] : 'manual-restore';
+        const snapshotId =
+          typeof params['snapshot_id'] === 'string' ? params['snapshot_id'] : 'latest';
+        const subdir =
+          typeof params['staging_subdir'] === 'string'
+            ? params['staging_subdir']
+            : 'manual-restore';
         if (subdir.includes('..') || !/^[A-Za-z0-9_-]{1,40}$/.test(subdir)) {
           throw new HomemcpError('POLICY_DENIED', `Invalid staging_subdir: ${subdir}`);
         }
@@ -320,8 +352,8 @@ export class MockExecutor implements AgentExecutor {
       case 'backup.prune_set': {
         const set = typeof params['set'] === 'string' ? params['set'] : 'vaultwarden';
         const dryRun = params['dry_run'] !== false;
-        const matching = this.state.backupSnapshots.filter((s) =>
-          Array.isArray(s['tags']) && (s['tags'] as string[]).includes(`set=${set}`),
+        const matching = this.state.backupSnapshots.filter(
+          (s) => Array.isArray(s['tags']) && (s['tags'] as string[]).includes(`set=${set}`),
         );
         return {
           set,
@@ -335,8 +367,14 @@ export class MockExecutor implements AgentExecutor {
 
       case 'files.read': {
         const p = typeof params['path'] === 'string' ? params['path'] : '';
-        if (p.includes('..') || (!p.startsWith('/home/homelab/') && !p.startsWith('/mnt/storage/'))) {
-          throw new HomemcpError('POLICY_DENIED', `Path outside allowed roots or contains traversal: ${p}`);
+        if (
+          p.includes('..') ||
+          (!p.startsWith('/home/homelab/') && !p.startsWith('/mnt/storage/'))
+        ) {
+          throw new HomemcpError(
+            'POLICY_DENIED',
+            `Path outside allowed roots or contains traversal: ${p}`,
+          );
         }
         if (isDeniedPath(p)) {
           throw new HomemcpError('POLICY_DENIED', `Reading denied file is forbidden: ${p}`);
@@ -352,11 +390,18 @@ export class MockExecutor implements AgentExecutor {
       }
 
       case 'files.list': {
-        const dir = (typeof params['path'] === 'string' ? params['path'] : '/home/homelab/docker-containers').replace(/\/+$/, '');
+        const dir = (
+          typeof params['path'] === 'string' ? params['path'] : '/home/homelab/docker-containers'
+        ).replace(/\/+$/, '');
         if (dir.includes('..')) throw new HomemcpError('POLICY_DENIED', 'Traversal denied');
         const prefix = `${dir}/`;
         const seen = new Set<string>();
-        const entries: Array<{ name: string; type: 'file' | 'dir' | 'other'; size_bytes: number; mtime: string }> = [];
+        const entries: Array<{
+          name: string;
+          type: 'file' | 'dir' | 'other';
+          size_bytes: number;
+          mtime: string;
+        }> = [];
         for (const [k, v] of Object.entries(this.state.files)) {
           if (!k.startsWith(prefix)) continue;
           const rest = k.slice(prefix.length);
@@ -390,8 +435,9 @@ export class MockExecutor implements AgentExecutor {
       case 'files.search': {
         const root = typeof params['root'] === 'string' ? params['root'] : '/';
         const pat = (typeof params['pattern'] === 'string' ? params['pattern'] : '').toLowerCase();
-        const matches = Object.keys(this.state.files)
-          .filter((k) => k.startsWith(root) && k.toLowerCase().includes(pat) && !isDeniedPath(k));
+        const matches = Object.keys(this.state.files).filter(
+          (k) => k.startsWith(root) && k.toLowerCase().includes(pat) && !isDeniedPath(k),
+        );
         return { matches };
       }
 
@@ -409,7 +455,10 @@ export class MockExecutor implements AgentExecutor {
 
       case 'files.mkdir': {
         const p = typeof params['path'] === 'string' ? params['path'] : '';
-        if (p.includes('..') || (!p.startsWith('/home/homelab/') && !p.startsWith('/mnt/storage/'))) {
+        if (
+          p.includes('..') ||
+          (!p.startsWith('/home/homelab/') && !p.startsWith('/mnt/storage/'))
+        ) {
           throw new HomemcpError('POLICY_DENIED', `Path outside allowed roots: ${p}`);
         }
         return { path: p, created: true };
@@ -432,7 +481,8 @@ export class MockExecutor implements AgentExecutor {
         const src = typeof params['src'] === 'string' ? params['src'] : '';
         const dst = typeof params['dst'] === 'string' ? params['dst'] : '';
         const overwrite = params['overwrite'] === true;
-        if (src.includes('..') || dst.includes('..')) throw new HomemcpError('POLICY_DENIED', 'Traversal denied');
+        if (src.includes('..') || dst.includes('..'))
+          throw new HomemcpError('POLICY_DENIED', 'Traversal denied');
         const val = this.state.files[src];
         if (val === undefined) throw new HomemcpError('NOT_FOUND', `Source not found: ${src}`);
         if (!overwrite && this.state.files[dst] !== undefined) {
@@ -456,7 +506,9 @@ export class MockExecutor implements AgentExecutor {
       case 'stacks.apply': {
         const name = typeof params['name'] === 'string' ? params['name'] : '';
         const yaml = typeof params['compose_yaml'] === 'string' ? params['compose_yaml'] : '';
-        const secretKeys = Array.isArray(params['secret_keys']) ? (params['secret_keys'] as string[]) : [];
+        const secretKeys = Array.isArray(params['secret_keys'])
+          ? (params['secret_keys'] as string[])
+          : [];
         const start = params['start'] !== false;
         const stackDir = `/home/homelab/docker-containers/${name}`;
         const pol = validateComposePolicy(yaml, {
@@ -472,7 +524,9 @@ export class MockExecutor implements AgentExecutor {
         }
         this.state.files[`${stackDir}/docker-compose.yml`] = yaml;
         if (secretKeys.length > 0) {
-          this.state.files[`${stackDir}/.env`] = secretKeys.map((k) => `${k}=mock-generated-secret-value`).join('\n');
+          this.state.files[`${stackDir}/.env`] = secretKeys
+            .map((k) => `${k}=mock-generated-secret-value`)
+            .join('\n');
         }
         if (!this.state.stacks.some((s) => s.name === name)) {
           this.state.stacks.push({
@@ -482,7 +536,10 @@ export class MockExecutor implements AgentExecutor {
             compose_files: ['docker-compose.yml'],
             compose_yaml_redacted_source: yaml,
             services: [{ name, image: 'curated', ports: [], volumes: [] }],
-            env_files: secretKeys.length > 0 ? [{ name: '.env', mode: '0600', uid: 999, gid: 999, size_bytes: 64 }] : [],
+            env_files:
+              secretKeys.length > 0
+                ? [{ name: '.env', mode: '0600', uid: 999, gid: 999, size_bytes: 64 }]
+                : [],
             policy_allowed: true,
             policy_violations: [],
             policy_warnings: pol.warnings,
@@ -520,7 +577,9 @@ export class MockExecutor implements AgentExecutor {
         const name = dir.split('/').pop() ?? '';
         const stack = this.state.stacks.find((s) => s.dir === dir || s.name === name);
         if (!stack) throw new HomemcpError('NOT_FOUND', `Stack not found: ${dir}`);
-        if (!this.state.containers.some((c) => c.Labels['com.docker.compose.project'] === stack.name)) {
+        if (
+          !this.state.containers.some((c) => c.Labels['com.docker.compose.project'] === stack.name)
+        ) {
           this.state.containers.push({
             Id: `c-${stack.name}`,
             Names: [`/${stack.name}`],
@@ -545,7 +604,9 @@ export class MockExecutor implements AgentExecutor {
         const dir = typeof params['stack_dir'] === 'string' ? params['stack_dir'] : '';
         const name = dir.split('/').pop() ?? '';
         this.state.containers = this.state.containers.filter(
-          (c) => c.Labels['com.docker.compose.project'] !== name && c.Labels['com.docker.compose.project.working_dir'] !== dir,
+          (c) =>
+            c.Labels['com.docker.compose.project'] !== name &&
+            c.Labels['com.docker.compose.project.working_dir'] !== dir,
         );
         return { stack_dir: dir, status: 'down' };
       }
@@ -554,10 +615,15 @@ export class MockExecutor implements AgentExecutor {
         const dir = typeof params['stack_dir'] === 'string' ? params['stack_dir'] : '';
         const name = dir.split('/').pop() ?? '';
         this.state.containers = this.state.containers.filter(
-          (c) => c.Labels['com.docker.compose.project'] !== name && c.Labels['com.docker.compose.project.working_dir'] !== dir,
+          (c) =>
+            c.Labels['com.docker.compose.project'] !== name &&
+            c.Labels['com.docker.compose.project.working_dir'] !== dir,
         );
         this.state.stacks = this.state.stacks.filter((s) => s.dir !== dir && s.name !== name);
-        return { stack_dir: dir, trash_path: `/home/homelab/docker-containers/.trash/${name}-${Date.now()}` };
+        return {
+          stack_dir: dir,
+          trash_path: `/home/homelab/docker-containers/.trash/${name}-${Date.now()}`,
+        };
       }
 
       case 'stacks.validate': {
@@ -571,9 +637,14 @@ export class MockExecutor implements AgentExecutor {
         const action = typeof params['action'] === 'string' ? params['action'] : 'restart';
         const override = params['override_protected'] === true;
         if (['vaultwarden', 'nginx-pm-app-1', 'homemcp'].includes(name) && !override) {
-          throw new HomemcpError('POLICY_DENIED', `Protected container "${name}" requires T3 override`);
+          throw new HomemcpError(
+            'POLICY_DENIED',
+            `Protected container "${name}" requires T3 override`,
+          );
         }
-        const c = this.state.containers.find((x) => x.Names.some((n) => n.replace(/^\//, '') === name));
+        const c = this.state.containers.find((x) =>
+          x.Names.some((n) => n.replace(/^\//, '') === name),
+        );
         if (!c) throw new HomemcpError('NOT_FOUND', `Container not found: ${name}`);
         c.State = action === 'stop' ? 'exited' : 'running';
         c.Status = action === 'stop' ? 'Exited (0)' : 'Up 1 second (healthy)';
@@ -582,8 +653,11 @@ export class MockExecutor implements AgentExecutor {
 
       case 'docker.compose_update': {
         const service = typeof params['service'] === 'string' ? params['service'] : '';
-        const targetImage = typeof params['target_image'] === 'string' ? params['target_image'] : undefined;
-        const c = this.state.containers.find((x) => x.Names.some((n) => n.replace(/^\//, '') === service));
+        const targetImage =
+          typeof params['target_image'] === 'string' ? params['target_image'] : undefined;
+        const c = this.state.containers.find((x) =>
+          x.Names.some((n) => n.replace(/^\//, '') === service),
+        );
         const prevDigest = c?.ImageID ?? 'sha256:000000';
         if (this.state.simulateUpdateHealthFailure) {
           return {
@@ -591,7 +665,8 @@ export class MockExecutor implements AgentExecutor {
             previous_digests: { [c?.Id ?? 'c1']: prevDigest },
             updated: false,
             rolled_back: true,
-            reason: 'Health gate failed (simulated unhealthy after update); restored previous digest',
+            reason:
+              'Health gate failed (simulated unhealthy after update); restored previous digest',
           };
         }
         if (c && targetImage) c.Image = targetImage;
@@ -607,7 +682,9 @@ export class MockExecutor implements AgentExecutor {
         const apply = params['apply'] === true;
         return {
           applied: apply,
-          reclaimed_summary: apply ? 'Pruned 2 stopped containers, 1 dangling image (420 MB)' : 'Dry run: 2 stopped containers, 1 dangling image',
+          reclaimed_summary: apply
+            ? 'Pruned 2 stopped containers, 1 dangling image (420 MB)'
+            : 'Dry run: 2 stopped containers, 1 dangling image',
         };
       }
 

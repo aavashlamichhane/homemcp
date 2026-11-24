@@ -55,8 +55,7 @@ export class ConfirmationGate {
 
   public getConfirmation(id: string): ConfirmationRecord | undefined {
     const row = this.db.db.prepare('SELECT * FROM confirmations WHERE id = ?').get(id) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     return row ? this.rowToRecord(row) : undefined;
   }
 
@@ -140,7 +139,9 @@ export class ConfirmationGate {
     nowEpochSec = Math.floor(Date.now() / 1000),
   ): ConfirmationRecord | undefined {
     const rows = this.db.db
-      .prepare("SELECT * FROM confirmations WHERE plan_id = ? AND status = 'approved' ORDER BY approved_at DESC")
+      .prepare(
+        "SELECT * FROM confirmations WHERE plan_id = ? AND status = 'approved' ORDER BY approved_at DESC",
+      )
       .all(planId) as Array<Record<string, unknown>>;
 
     for (const r of rows) {
@@ -162,7 +163,13 @@ export class ConfirmationGate {
     publicUrl: string;
   }): Promise<
     | { approved: true; plan: PlanRecord; confirmationId: string }
-    | { approved: false; plan: PlanRecord; confirmationId: string; confirmUrl: string; expiresAt: string }
+    | {
+        approved: false;
+        plan: PlanRecord;
+        confirmationId: string;
+        confirmUrl: string;
+        expiresAt: string;
+      }
   > {
     const plan = this.plans.assertPlanReady(opts.planId, opts.expectedTool);
     const requirePasskey = opts.tier === 'T3';
@@ -177,7 +184,9 @@ export class ConfirmationGate {
       try {
         const maybeElicit = (
           opts.mcpCtx.mcpReq as unknown as {
-            elicitInput?: (p: unknown) => Promise<{ action: string; content?: Record<string, unknown> }>;
+            elicitInput?: (
+              p: unknown,
+            ) => Promise<{ action: string; content?: Record<string, unknown> }>;
           }
         ).elicitInput;
         if (typeof maybeElicit === 'function') {
@@ -214,7 +223,9 @@ export class ConfirmationGate {
 
     // Check if an existing pending challenge already exists for this plan
     const pendingRow = this.db.db
-      .prepare("SELECT * FROM confirmations WHERE plan_id = ? AND status = 'pending' ORDER BY expires_at DESC LIMIT 1")
+      .prepare(
+        "SELECT * FROM confirmations WHERE plan_id = ? AND status = 'pending' ORDER BY expires_at DESC LIMIT 1",
+      )
       .get(plan.id) as Record<string, unknown> | undefined;
 
     const challenge = pendingRow

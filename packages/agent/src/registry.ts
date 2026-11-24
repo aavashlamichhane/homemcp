@@ -41,10 +41,7 @@ export class VerbRegistry {
     const result = await def.handler(parsedIn.data);
     const parsedOut = def.outputSchema.safeParse(result);
     if (!parsedOut.success) {
-      throw new HomemcpError(
-        'INTERNAL_ERROR',
-        `Verb ${verbName} produced invalid output schema`,
-      );
+      throw new HomemcpError('INTERNAL_ERROR', `Verb ${verbName} produced invalid output schema`);
     }
     return parsedOut.data;
   }

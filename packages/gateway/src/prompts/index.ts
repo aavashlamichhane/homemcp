@@ -34,7 +34,8 @@ Summarize findings clearly and recommend safe next steps.`,
   registry.registerPrompt({
     name: 'security_review',
     title: 'Security Review',
-    description: 'Audit host firewall, SSH, listening ports, public routes, and Vaultwarden posture',
+    description:
+      'Audit host firewall, SSH, listening ports, public routes, and Vaultwarden posture',
     handler: () =>
       Promise.resolve({
         messages: [
@@ -56,7 +57,8 @@ Report any findings sorted by severity.`,
   registry.registerPrompt({
     name: 'build_playlist',
     title: 'Build Playlist',
-    description: 'Find matching songs in Navidrome, search YouTube for missing songs via NaviLoad, and build a playlist',
+    description:
+      'Find matching songs in Navidrome, search YouTube for missing songs via NaviLoad, and build a playlist',
     argsSchema: z.object({
       name: z.string().describe('Playlist name'),
       theme_or_songs: z.string().describe('Theme or comma/newline-separated artist - title list'),
@@ -84,7 +86,8 @@ Report any findings sorted by severity.`,
   registry.registerPrompt({
     name: 'daily_briefing',
     title: 'Daily Server Briefing',
-    description: 'Summarize open alerts, host health, backup freshness, downloads, and media sessions',
+    description:
+      'Summarize open alerts, host health, backup freshness, downloads, and media sessions',
     handler: () =>
       Promise.resolve({
         messages: [
@@ -148,7 +151,8 @@ Highlight anything requiring attention today.`,
   registry.registerPrompt({
     name: 'deploy_service',
     title: 'Deploy & Expose Service',
-    description: 'Plan deploying a curated Compose template and optionally exposing it via NPM + Cloudflare',
+    description:
+      'Plan deploying a curated Compose template and optionally exposing it via NPM + Cloudflare',
     argsSchema: z.object({
       name: z.string(),
       template: z.string().default('uptime-kuma'),
@@ -179,7 +183,8 @@ ${hostname ? `3. Call expose_plan({ hostname: "${hostname}", upstream_host: "${n
   registry.registerPrompt({
     name: 'disk_cleanup',
     title: 'Disk Cleanup Assessment',
-    description: 'Inspect disk usage trends, Docker reclaimable space, and media/files directories safely',
+    description:
+      'Inspect disk usage trends, Docker reclaimable space, and media/files directories safely',
     handler: () =>
       Promise.resolve({
         messages: [

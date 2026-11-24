@@ -36,8 +36,7 @@ export class HomemcpDb {
     this.db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
     const defaultDir = path.resolve(import.meta.dirname, 'migrations');
     const fallbackSrcDir = path.resolve(import.meta.dirname, '../../src/db/migrations');
-    const resolvedDir =
-      migrationsDir ?? (existsSync(defaultDir) ? defaultDir : fallbackSrcDir);
+    const resolvedDir = migrationsDir ?? (existsSync(defaultDir) ? defaultDir : fallbackSrcDir);
     this.runMigrations(resolvedDir);
   }
 
@@ -50,9 +49,9 @@ export class HomemcpDb {
       );
     `);
 
-    const appliedRows = this.db
-      .prepare('SELECT name FROM schema_migrations')
-      .all() as Array<{ name: string }>;
+    const appliedRows = this.db.prepare('SELECT name FROM schema_migrations').all() as Array<{
+      name: string;
+    }>;
     const applied = new Set(appliedRows.map((r) => r.name));
 
     const files = readdirSync(dir)
@@ -137,7 +136,11 @@ export class HomemcpDb {
     return rows.map((r) => ({ ...r }) as unknown as AuditRecord);
   }
 
-  public insertMetricSnapshot(kind: string, payload: unknown, ts: string = new Date().toISOString()): void {
+  public insertMetricSnapshot(
+    kind: string,
+    payload: unknown,
+    ts: string = new Date().toISOString(),
+  ): void {
     this.db
       .prepare('INSERT INTO metric_snapshots (ts, kind, payload_json) VALUES (?, ?, ?)')
       .run(ts, kind, JSON.stringify(payload));
@@ -145,7 +148,9 @@ export class HomemcpDb {
 
   public getMetricSnapshots(kind: string, limit = 90): Array<{ ts: string; payload: unknown }> {
     const rows = this.db
-      .prepare('SELECT ts, payload_json FROM metric_snapshots WHERE kind = ? ORDER BY ts DESC LIMIT ?')
+      .prepare(
+        'SELECT ts, payload_json FROM metric_snapshots WHERE kind = ? ORDER BY ts DESC LIMIT ?',
+      )
       .all(kind, limit) as Array<{ ts: string; payload_json: string }>;
     return rows.map((r) => ({
       ts: r.ts,
@@ -207,7 +212,12 @@ export class HomemcpDb {
 
   public updateMusicJobItem(
     id: number,
-    patch: { playlistId?: string | undefined; naviloadTrackId?: string | undefined; state?: string | undefined; songId?: string | undefined },
+    patch: {
+      playlistId?: string | undefined;
+      naviloadTrackId?: string | undefined;
+      state?: string | undefined;
+      songId?: string | undefined;
+    },
   ): void {
     this.db
       .prepare(

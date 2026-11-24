@@ -28,7 +28,9 @@ export function registerDownloadsModule(deps: GatewayDeps): void {
     },
     inputSchema: z
       .object({
-        filter: z.enum(['all', 'downloading', 'seeding', 'completed', 'paused', 'active', 'stalled']).default('all'),
+        filter: z
+          .enum(['all', 'downloading', 'seeding', 'completed', 'paused', 'active', 'stalled'])
+          .default('all'),
       })
       .strict(),
     outputSchema: z.object({
@@ -97,7 +99,11 @@ export function registerDownloadsModule(deps: GatewayDeps): void {
 
       // Find deepest matching mountpoint for savePath
       const matchingFs = [...disks.filesystems]
-        .filter((f) => savePath === f.mountpoint || savePath.startsWith(f.mountpoint === '/' ? '/' : `${f.mountpoint}/`))
+        .filter(
+          (f) =>
+            savePath === f.mountpoint ||
+            savePath.startsWith(f.mountpoint === '/' ? '/' : `${f.mountpoint}/`),
+        )
         .sort((a, b) => b.mountpoint.length - a.mountpoint.length)[0];
 
       const avail = matchingFs?.available_bytes ?? 0;

@@ -35,8 +35,16 @@ export interface SubsonicConnector {
   ping(): Promise<boolean>;
   search3(
     query: string,
-    opts?: { songCount?: number | undefined; albumCount?: number | undefined; artistCount?: number | undefined },
-  ): Promise<{ artists: Array<Record<string, unknown>>; albums: Array<Record<string, unknown>>; songs: SubsonicSong[] }>;
+    opts?: {
+      songCount?: number | undefined;
+      albumCount?: number | undefined;
+      artistCount?: number | undefined;
+    },
+  ): Promise<{
+    artists: Array<Record<string, unknown>>;
+    albums: Array<Record<string, unknown>>;
+    songs: SubsonicSong[];
+  }>;
   getPlaylists(): Promise<SubsonicPlaylist[]>;
   getPlaylist(id: string): Promise<SubsonicPlaylist>;
   createPlaylist(name: string, songIds?: readonly string[]): Promise<SubsonicPlaylist>;
@@ -51,7 +59,10 @@ export interface SubsonicConnector {
   deletePlaylist(playlistId: string): Promise<void>;
   startScan(fullScan?: boolean): Promise<SubsonicScanStatus>;
   getScanStatus(): Promise<SubsonicScanStatus>;
-  getAlbumList2(type: 'newest' | 'recent' | 'frequent', size?: number): Promise<Array<Record<string, unknown>>>;
+  getAlbumList2(
+    type: 'newest' | 'recent' | 'frequent',
+    size?: number,
+  ): Promise<Array<Record<string, unknown>>>;
   getNowPlaying(): Promise<Array<Record<string, unknown>>>;
   getArtists(): Promise<Array<Record<string, unknown>>>;
   getSong(id: string): Promise<SubsonicSong>;
@@ -114,7 +125,11 @@ export class HttpSubsonicConnector implements SubsonicConnector {
 
   public async search3(
     query: string,
-    opts?: { songCount?: number | undefined; albumCount?: number | undefined; artistCount?: number | undefined },
+    opts?: {
+      songCount?: number | undefined;
+      albumCount?: number | undefined;
+      artistCount?: number | undefined;
+    },
   ) {
     const res = await this.call<{
       searchResult3?: {
@@ -145,7 +160,10 @@ export class HttpSubsonicConnector implements SubsonicConnector {
     return res.playlist;
   }
 
-  public async createPlaylist(name: string, songIds: readonly string[] = []): Promise<SubsonicPlaylist> {
+  public async createPlaylist(
+    name: string,
+    songIds: readonly string[] = [],
+  ): Promise<SubsonicPlaylist> {
     const params: Array<[string, string]> = [['name', name]];
     for (const id of songIds) params.push(['songId', id]);
     const res = await this.call<{ playlist: SubsonicPlaylist }>('createPlaylist', params);

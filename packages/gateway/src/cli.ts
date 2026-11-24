@@ -45,9 +45,14 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   return { command, transport, configPath, mock, force, toolsets };
 }
 
+let activeRedactor = new Redactor();
+
 async function runDoctor(args: CliArgs): Promise<number> {
   const redactor = new Redactor();
-  const config = args.configPath ? await loadConfig(args.configPath, process.env, redactor) : undefined;
+  activeRedactor = redactor;
+  const config = args.configPath
+    ? await loadConfig(args.configPath, process.env, redactor)
+    : undefined;
   const deps = createGatewayDeps({ config, mock: args.mock || !config, redactor });
 
   const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
@@ -55,13 +60,21 @@ async function runDoctor(args: CliArgs): Promise<number> {
     const h = await deps.agent.healthz();
     checks.push({ name: 'agent', ok: h.ok, detail: `${h.verbs.length} verbs` });
   } catch (err) {
-    checks.push({ name: 'agent', ok: false, detail: err instanceof Error ? err.message : String(err) });
+    checks.push({
+      name: 'agent',
+      ok: false,
+      detail: err instanceof Error ? err.message : String(err),
+    });
   }
 
   if (deps.docker) {
     try {
       const c = await deps.docker.listContainers(false);
-      checks.push({ name: 'docker-socket-proxy', ok: true, detail: `${c.length} running containers` });
+      checks.push({
+        name: 'docker-socket-proxy',
+        ok: true,
+        detail: `${c.length} running containers`,
+      });
     } catch (err) {
       checks.push({
         name: 'docker-socket-proxy',
@@ -76,14 +89,22 @@ async function runDoctor(args: CliArgs): Promise<number> {
       const h = await deps.npm.listProxyHosts();
       checks.push({ name: 'npm', ok: true, detail: `${h.length} proxy hosts` });
     } catch (err) {
-      checks.push({ name: 'npm', ok: false, detail: err instanceof Error ? err.message : String(err) });
+      checks.push({
+        name: 'npm',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
   if (deps.cloudflare) {
     try {
       const t = await deps.cloudflare.getTunnelStatus();
-      checks.push({ name: 'cloudflare', ok: true, detail: `${t.status} (${t.connections.length} conns)` });
+      checks.push({
+        name: 'cloudflare',
+        ok: true,
+        detail: `${t.status} (${t.connections.length} conns)`,
+      });
     } catch (err) {
       checks.push({
         name: 'cloudflare',
@@ -94,7 +115,8 @@ async function runDoctor(args: CliArgs): Promise<number> {
   }
 
   for (const c of checks) {
-    process.stdout.write(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}: ${c.detail}\n`);
+    const safeDetail = redactor.redactString(c.detail).text;
+    process.stdout.write(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}: ${safeDetail}\n`);
   }
   deps.db.close();
   return checks.every((c) => c.ok) ? 0 : 1;
@@ -102,7 +124,10 @@ async function runDoctor(args: CliArgs): Promise<number> {
 
 async function runBootstrap(args: CliArgs): Promise<number> {
   const redactor = new Redactor();
-  const config = args.configPath ? await loadConfig(args.configPath, process.env, redactor) : undefined;
+  activeRedactor = redactor;
+  const config = args.configPath
+    ? await loadConfig(args.configPath, process.env, redactor)
+    : undefined;
   const deps = createGatewayDeps({ config, mock: args.mock || !config, redactor });
   const rpId = new URL(deps.config.server.publicUrl).hostname;
   const authService = new OwnerAuthService(deps.db, {
@@ -140,7 +165,10 @@ async function main(): Promise<void> {
   }
 
   const redactor = new Redactor();
-  const config = args.configPath ? await loadConfig(args.configPath, process.env, redactor) : undefined;
+  activeRedactor = redactor;
+  const config = args.configPath
+    ? await loadConfig(args.configPath, process.env, redactor)
+    : undefined;
   const deps = createGatewayDeps({ config, mock: args.mock || !config, redactor });
 
   if (args.transport === 'http') {
@@ -167,7 +195,9 @@ async function main(): Promise<void> {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
-    process.stderr.write(`homemcp fatal: ${err instanceof Error ? err.message : String(err)}\n`);
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    const safeMsg = activeRedactor.redactString(rawMsg).text;
+    process.stderr.write(`homemcp fatal: ${safeMsg}\n`);
     process.exit(1);
   });
 }

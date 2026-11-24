@@ -88,7 +88,10 @@ export async function fetchCimdMetadata(
     const resolveFn = opts?.lookupFn ?? lookup;
     const records = await resolveFn(parsedUrl.hostname, { all: true }).catch(() => []);
     if (records.length === 0) {
-      throw new HomemcpError('UPSTREAM_UNAVAILABLE', `Failed to resolve CIMD host: ${parsedUrl.hostname}`);
+      throw new HomemcpError(
+        'UPSTREAM_UNAVAILABLE',
+        `Failed to resolve CIMD host: ${parsedUrl.hostname}`,
+      );
     }
     for (const r of records) {
       if (isPrivateOrReservedIp(r.address)) {

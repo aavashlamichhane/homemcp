@@ -75,13 +75,13 @@ pnpm eval
 pnpm check:secrets
 
 # Start gateway in mock stdio mode (for Claude Desktop / MCP Inspector)
-node packages/gateway/dist/cli.js stdio --mock
+node packages/gateway/dist/cli.js serve --transport stdio --mock
 ```
 
 Or run over local HTTP with `/mcp` or focused toolsets (e.g. `/mcp/vaultwarden,backup`):
 
 ```bash
-node packages/gateway/dist/cli.js serve --mock --port 8790
+node packages/gateway/dist/cli.js serve --transport http --mock
 ```
 
 ---
@@ -90,7 +90,7 @@ node packages/gateway/dist/cli.js serve --mock --port 8790
 
 1. **Host Agent (`homemcpd`):** Build the agent release (`deploy/agent/build-release.sh`) and install step-by-step scripts under `deploy/agent/` (`install-p1.sh` read-only baseline -> `install-p4.sh` backup -> `install-p5.sh` docker/systemd -> `install-p6.sh` stacks/files).
 2. **Gateway Container (`deploy/gateway/`):** Copy `examples/homemcp.config.example.yaml` and `deploy/gateway/.env.example`, set `HOMEMCP_SECRET_KEY` and `HOMEMCPD_HMAC_SECRET`, and launch via `deploy/gateway/deploy.sh`.
-3. **Bootstrap Owner Identity:** Run `docker exec -it homemcp node dist/cli.js auth bootstrap` to enroll a WebAuthn passkey, TOTP backup, and offline recovery codes.
+3. **Bootstrap Owner Identity:** Run `docker exec -it homemcp node /app/dist/cli.js auth bootstrap --config /config/homemcp.config.yaml` to enroll a WebAuthn passkey, TOTP backup, and offline recovery codes.
 
 Full step-by-step instructions are in [docs/deployment.md](docs/deployment.md), [docs/auth.md](docs/auth.md), and [docs/clients.md](docs/clients.md).
 

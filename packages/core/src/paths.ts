@@ -40,10 +40,7 @@ export async function resolveSafePath(allowedRoot: string, relPath: string): Pro
     if (stat.isSymbolicLink()) {
       const targetReal = await realpath(candidate);
       if (!isWithinRoot(realRoot, targetReal)) {
-        throw new HomemcpError(
-          'POLICY_DENIED',
-          `Symlink target escapes allowed root: ${relPath}`,
-        );
+        throw new HomemcpError('POLICY_DENIED', `Symlink target escapes allowed root: ${relPath}`);
       }
       return targetReal;
     }
@@ -101,8 +98,5 @@ export async function resolveAgainstAllowedRoots(
       }
     }
   }
-  throw new HomemcpError(
-    'POLICY_DENIED',
-    `Path is outside all allowed roots: ${targetPath}`,
-  );
+  throw new HomemcpError('POLICY_DENIED', `Path is outside all allowed roots: ${targetPath}`);
 }

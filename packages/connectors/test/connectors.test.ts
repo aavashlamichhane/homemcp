@@ -37,13 +37,29 @@ describe('P1 connectors', () => {
             Name: '/cloudflared',
             Created: '2026-01-01T00:00:00Z',
             Image: 'sha256:abc',
-            State: { Status: 'running', Running: true, Restarting: false, OOMKilled: false, ExitCode: 0, StartedAt: '', FinishedAt: '' },
+            State: {
+              Status: 'running',
+              Running: true,
+              Restarting: false,
+              OOMKilled: false,
+              ExitCode: 0,
+              StartedAt: '',
+              FinishedAt: '',
+            },
             RestartCount: 0,
             Config: {
               Image: 'cloudflare/cloudflared:2026.5.2',
-              Env: ['TUNNEL_TOKEN=eyJhIjoiYWJjZGVmMDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzIn0=', 'PORT=8080'],
+              Env: [
+                'TUNNEL_TOKEN=eyJhIjoiYWJjZGVmMDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzIn0=',
+                'PORT=8080',
+              ],
               Labels: {},
-              Cmd: ['tunnel', 'run', '--token', 'eyJhIjoiYWJjZGVmMDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzIn0='],
+              Cmd: [
+                'tunnel',
+                'run',
+                '--token',
+                'eyJhIjoiYWJjZGVmMDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzIn0=',
+              ],
             },
             Mounts: [],
             NetworkSettings: { Networks: { cloudflared_default: {} }, Ports: {} },
@@ -78,13 +94,35 @@ describe('P1 connectors', () => {
       if (req.url === '/api/tokens' && req.method === 'POST') {
         tokenCalls++;
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ token: 'npm-jwt-123', expires: new Date(Date.now() + 3600_000).toISOString() }));
+        res.end(
+          JSON.stringify({
+            token: 'npm-jwt-123',
+            expires: new Date(Date.now() + 3600_000).toISOString(),
+          }),
+        );
         return;
       }
       if (req.url?.startsWith('/api/nginx/proxy-hosts')) {
         expect(req.headers.authorization).toBe('Bearer npm-jwt-123');
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify([{ id: 1, domain_names: ['app.example.com'], forward_scheme: 'http', forward_host: '192.0.2.10', forward_port: 8080, certificate_id: 2, access_list_id: 0, ssl_forced: true, block_exploits: true, allow_websocket_upgrade: true, caching_enabled: false, enabled: true }]));
+        res.end(
+          JSON.stringify([
+            {
+              id: 1,
+              domain_names: ['app.example.com'],
+              forward_scheme: 'http',
+              forward_host: '192.0.2.10',
+              forward_port: 8080,
+              certificate_id: 2,
+              access_list_id: 0,
+              ssl_forced: true,
+              block_exploits: true,
+              allow_websocket_upgrade: true,
+              caching_enabled: false,
+              enabled: true,
+            },
+          ]),
+        );
         return;
       }
       res.writeHead(404);

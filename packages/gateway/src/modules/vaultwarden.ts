@@ -26,12 +26,16 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
       const containerName = deps.config.modules.vaultwarden?.container ?? 'vaultwarden';
       const emptyBackup: { status: Record<string, Record<string, unknown>> } = { status: {} };
       const [inspected, backupData, stacksScan] = await Promise.all([
-        deps.docker ? deps.docker.inspectContainer(containerName).catch(() => null) : Promise.resolve(null),
+        deps.docker
+          ? deps.docker.inspectContainer(containerName).catch(() => null)
+          : Promise.resolve(null),
         deps.agent
           .call<{ status: Record<string, Record<string, unknown>> }>('backup.read_status')
           .catch(() => emptyBackup),
         deps.agent
-          .call<{ stacks: Array<{ name: string; compose_yaml_redacted_source?: string }> }>('stacks.scan')
+          .call<{ stacks: Array<{ name: string; compose_yaml_redacted_source?: string }> }>(
+            'stacks.scan',
+          )
           .catch(() => ({ stacks: [] })),
       ]);
 
@@ -118,7 +122,8 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
           last_status: lastStatus,
           last_success: lastSuccess,
           last_snapshot: typeof vw['last_snapshot'] === 'string' ? vw['last_snapshot'] : null,
-          last_bytes_added: typeof vw['last_bytes_added'] === 'number' ? vw['last_bytes_added'] : null,
+          last_bytes_added:
+            typeof vw['last_bytes_added'] === 'number' ? vw['last_bytes_added'] : null,
           age_seconds: ageSec,
           rpo_seconds: rpoSec,
           stale,
@@ -129,7 +134,13 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
           within_budget: totalSize <= budget,
           schedule: 'Every 6 hours (00:15, 06:15, 12:15, 18:15)',
           retention_policy: 'keep-last 4, keep-daily 14, keep-weekly 8, keep-monthly 12',
-          includes: ['db.sqlite3 (consistent backup)', 'rsa_key*', 'config.json', 'attachments/', 'sends/'],
+          includes: [
+            'db.sqlite3 (consistent backup)',
+            'rsa_key*',
+            'config.json',
+            'attachments/',
+            'sends/',
+          ],
         },
       };
     },
@@ -192,19 +203,23 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
     }),
     handler: async (_args, ctx) => {
       let exitCode = 1;
-      const job = deps.jobs.startBackground('vaultwarden_backup_run', ctx.auth.subject, async (jctx) => {
-        await jctx.addStep('Running consistent Vaultwarden Restic backup', 20);
-        const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
-          'backup.run',
-          { set: 'vaultwarden' },
-        );
-        exitCode = res.exit_code;
-        if (res.exit_code !== 0) {
-          throw new Error(`Vaultwarden backup failed: ${res.output}`);
-        }
-        await jctx.setProgress(100, 'Vaultwarden backup uploaded and verified');
-        return res;
-      });
+      const job = deps.jobs.startBackground(
+        'vaultwarden_backup_run',
+        ctx.auth.subject,
+        async (jctx) => {
+          await jctx.addStep('Running consistent Vaultwarden Restic backup', 20);
+          const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
+            'backup.run',
+            { set: 'vaultwarden' },
+          );
+          exitCode = res.exit_code;
+          if (res.exit_code !== 0) {
+            throw new Error(`Vaultwarden backup failed: ${res.output}`);
+          }
+          await jctx.setProgress(100, 'Vaultwarden backup uploaded and verified');
+          return res;
+        },
+      );
       await deps.jobs.waitForJob(job.id);
       const finalJob = deps.jobs.getJob(job.id)!;
       return {
@@ -235,7 +250,10 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
     },
     inputSchema: z
       .object({
-        snapshot_id: z.string().regex(/^(?:latest|[a-f0-9]{6,64})$/).default('latest'),
+        snapshot_id: z
+          .string()
+          .regex(/^(?:latest|[a-f0-9]{6,64})$/)
+          .default('latest'),
       })
       .strict(),
     outputSchema: z.object({
@@ -248,19 +266,26 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
     handler: async (args, ctx) => {
       let exitCode = 1;
       let output = '';
-      const job = deps.jobs.startBackground('vaultwarden_backup_test', ctx.auth.subject, async (jctx) => {
-        await jctx.addStep(`Testing restore integrity of Vaultwarden snapshot ${args.snapshot_id}`, 25);
-        const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
-          'backup.restore_test',
-          { set: 'vaultwarden', snapshot_id: args.snapshot_id },
-        );
-        exitCode = res.exit_code;
-        output = res.output;
-        if (res.exit_code !== 0) {
-          throw new Error(`Vaultwarden restore test failed: ${res.output}`);
-        }
-        return res;
-      });
+      const job = deps.jobs.startBackground(
+        'vaultwarden_backup_test',
+        ctx.auth.subject,
+        async (jctx) => {
+          await jctx.addStep(
+            `Testing restore integrity of Vaultwarden snapshot ${args.snapshot_id}`,
+            25,
+          );
+          const res = await deps.agent.call<{ set: string; exit_code: number; output: string }>(
+            'backup.restore_test',
+            { set: 'vaultwarden', snapshot_id: args.snapshot_id },
+          );
+          exitCode = res.exit_code;
+          output = res.output;
+          if (res.exit_code !== 0) {
+            throw new Error(`Vaultwarden restore test failed: ${res.output}`);
+          }
+          return res;
+        },
+      );
       await deps.jobs.waitForJob(job.id);
       const finalJob = deps.jobs.getJob(job.id)!;
       return {
@@ -292,8 +317,14 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
     },
     inputSchema: z
       .object({
-        snapshot_id: z.string().regex(/^(?:latest|[a-f0-9]{6,64})$/).default('latest'),
-        staging_subdir: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).default('vw-recovery'),
+        snapshot_id: z
+          .string()
+          .regex(/^(?:latest|[a-f0-9]{6,64})$/)
+          .default('latest'),
+        staging_subdir: z
+          .string()
+          .regex(/^[A-Za-z0-9_-]{1,40}$/)
+          .default('vw-recovery'),
         plan_id: z.string().optional(),
       })
       .strict(),
@@ -402,15 +433,18 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
     },
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (_args, ctx) => {
-      const preview = await deps.agent.call<{ set: string; dry_run: boolean; exit_code: number; output: string }>(
-        'backup.prune_set',
-        { set: 'vaultwarden', dry_run: true },
-      );
+      const preview = await deps.agent.call<{
+        set: string;
+        dry_run: boolean;
+        exit_code: number;
+        output: string;
+      }>('backup.prune_set', { set: 'vaultwarden', dry_run: true });
       const plan = deps.plans.createPlan({
         tool: 'vaultwarden_backup_prune_apply',
         tier: 'T2',
         payload: { set: 'vaultwarden' },
-        summary: 'Apply Vaultwarden retention policy (keep-last 4, daily 14, weekly 8, monthly 12) and prune expired packs',
+        summary:
+          'Apply Vaultwarden retention policy (keep-last 4, daily 14, weekly 8, monthly 12) and prune expired packs',
         diff: preview.output,
         sideEffects: ['Deletes expired Vaultwarden snapshots beyond retention window from R2'],
         rollback: ['Expired snapshot data removed by restic prune cannot be recovered'],
@@ -469,10 +503,12 @@ export function registerVaultwardenModule(deps: GatewayDeps): void {
           confirmationId: gate.confirmationId,
         };
       }
-      const res = await deps.agent.call<{ set: string; dry_run: boolean; exit_code: number; output: string }>(
-        'backup.prune_set',
-        { set: 'vaultwarden', dry_run: false },
-      );
+      const res = await deps.agent.call<{
+        set: string;
+        dry_run: boolean;
+        exit_code: number;
+        output: string;
+      }>('backup.prune_set', { set: 'vaultwarden', dry_run: false });
       if (res.exit_code !== 0) {
         throw new HomemcpError('INTERNAL_ERROR', `Vaultwarden prune failed: ${res.output}`);
       }

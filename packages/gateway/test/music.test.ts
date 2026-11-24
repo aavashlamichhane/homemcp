@@ -104,7 +104,9 @@ describe('Phase 3 Music, NaviLoad, and Jobs Engine', () => {
       suggestion_index: 0,
     });
     expect(deniedReview.isError).toBe(true);
-    expect((deniedReview.structuredContent['error'] as { code: string }).code).toBe('CONFIRMATION_REQUIRED');
+    expect((deniedReview.structuredContent['error'] as { code: string }).code).toBe(
+      'CONFIRMATION_REQUIRED',
+    );
 
     // Cannot save before review decision
     const deniedSave = await client.callTool('naviload_save', { track_id: newTrackId });

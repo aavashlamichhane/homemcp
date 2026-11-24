@@ -72,9 +72,9 @@ export function registerCoreModule(deps: GatewayDeps): void {
           filesystems: Array<{ mountpoint: string; use_percent: number; available_bytes: number }>;
         }>('system.disks'),
         deps.agent.call<{ upgradable_count: number; security_count: number }>('system.updates'),
-        deps.agent.call<{ status: Record<string, { last_status?: string; last_success?: string }> }>(
-          'backup.read_status',
-        ),
+        deps.agent.call<{
+          status: Record<string, { last_status?: string; last_success?: string }>;
+        }>('backup.read_status'),
         deps.docker ? deps.docker.listContainers(true) : Promise.resolve([]),
       ]);
 
@@ -104,7 +104,9 @@ export function registerCoreModule(deps: GatewayDeps): void {
       const backups = Object.entries(configuredSets).map(([setName, cfg]) => {
         const st = backupData.status[setName];
         const lastSuccess = st?.last_success;
-        const ageSec = lastSuccess ? Math.floor((nowMs - Date.parse(lastSuccess)) / 1000) : undefined;
+        const ageSec = lastSuccess
+          ? Math.floor((nowMs - Date.parse(lastSuccess)) / 1000)
+          : undefined;
         const rpoSec = Math.floor(parseDurationMs(cfg.rpo) / 1000);
         const stale = ageSec === undefined || ageSec > rpoSec || st?.last_status !== 'success';
         return {
@@ -116,11 +118,18 @@ export function registerCoreModule(deps: GatewayDeps): void {
       });
 
       const hints: string[] = [];
-      if (unhealthy.length > 0) hints.push(`Inspect unhealthy containers with docker_service_profile: ${unhealthy.join(', ')}`);
-      if (sysHealth.failed_units.length > 0) hints.push(`Check failed systemd units via system_logs_query`);
-      if (backups.some((b) => b.stale)) hints.push(`Stale backups detected; inspect with backup_status`);
-      if (sysDisks.filesystems.some((d) => d.use_percent >= 85)) hints.push(`Disk >=85%; run system_disks`);
-      if (sysUpdates.security_count > 0) hints.push(`${sysUpdates.security_count} security updates pending; run system_updates`);
+      if (unhealthy.length > 0)
+        hints.push(
+          `Inspect unhealthy containers with docker_service_profile: ${unhealthy.join(', ')}`,
+        );
+      if (sysHealth.failed_units.length > 0)
+        hints.push(`Check failed systemd units via system_logs_query`);
+      if (backups.some((b) => b.stale))
+        hints.push(`Stale backups detected; inspect with backup_status`);
+      if (sysDisks.filesystems.some((d) => d.use_percent >= 85))
+        hints.push(`Disk >=85%; run system_disks`);
+      if (sysUpdates.security_count > 0)
+        hints.push(`${sysUpdates.security_count} security updates pending; run system_updates`);
 
       const summary = [
         `CPU ${sysHealth.cpu_percent}%, Load ${sysHealth.load_avg.join('/')}, Mem ${memUsedPct}%${maxTemp !== undefined ? `, MaxTemp ${maxTemp}°C` : ''}`,

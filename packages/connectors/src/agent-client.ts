@@ -27,10 +27,7 @@ export class HttpUnixAgentClient implements AgentExecutor {
     return JSON.parse(res.body) as { ok: boolean; verbs: string[] };
   }
 
-  public async call<T = unknown>(
-    verb: string,
-    params: Record<string, unknown> = {},
-  ): Promise<T> {
+  public async call<T = unknown>(verb: string, params: Record<string, unknown> = {}): Promise<T> {
     const payload = JSON.stringify({ verb, params });
     const headers = signAgentRequest(this.hmacSecret, 'POST', payload);
     const res = await this.request('POST', '/rpc', payload, {

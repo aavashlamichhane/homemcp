@@ -73,7 +73,9 @@ function parseBindSource(vol: unknown): string | undefined {
 }
 
 function isNamedVolume(src: string): boolean {
-  return !src.startsWith('/') && !src.startsWith('.') && !src.startsWith('~') && !src.includes('${');
+  return (
+    !src.startsWith('/') && !src.startsWith('.') && !src.startsWith('~') && !src.includes('${')
+  );
 }
 
 function checkPortBinding(portSpec: unknown): { ok: boolean; detail: string } {
@@ -84,8 +86,7 @@ function checkPortBinding(portSpec: unknown): { ok: boolean; detail: string } {
     const rec = portSpec as Record<string, unknown>;
     const hostIp = typeof rec['host_ip'] === 'string' ? rec['host_ip'] : '';
     const pubRaw = rec['published'];
-    const pub =
-      typeof pubRaw === 'string' || typeof pubRaw === 'number' ? String(pubRaw) : '';
+    const pub = typeof pubRaw === 'string' || typeof pubRaw === 'number' ? String(pubRaw) : '';
     if (!hostIp) {
       return { ok: false, detail: `Port ${pub || '<unknown>'} has no host_ip bind address` };
     }
@@ -136,14 +137,22 @@ export function validateComposePolicy(
   }
 
   if (!doc || typeof doc !== 'object') {
-    violations.push({ service: '<compose>', rule: 'schema', message: 'Compose must be a YAML mapping' });
+    violations.push({
+      service: '<compose>',
+      rule: 'schema',
+      message: 'Compose must be a YAML mapping',
+    });
     return { allowed: false, violations, warnings };
   }
 
   const rootObj = doc as Record<string, unknown>;
   const services = rootObj['services'];
   if (!services || typeof services !== 'object' || Array.isArray(services)) {
-    violations.push({ service: '<compose>', rule: 'services', message: 'Missing services mapping' });
+    violations.push({
+      service: '<compose>',
+      rule: 'services',
+      message: 'Missing services mapping',
+    });
     return { allowed: false, violations, warnings };
   }
 
@@ -154,14 +163,22 @@ export function validateComposePolicy(
 
   for (const [svcName, svcRaw] of Object.entries(services as Record<string, unknown>)) {
     if (!svcRaw || typeof svcRaw !== 'object') {
-      violations.push({ service: svcName, rule: 'service_shape', message: 'Service must be an object' });
+      violations.push({
+        service: svcName,
+        rule: 'service_shape',
+        message: 'Service must be an object',
+      });
       continue;
     }
     const svc = svcRaw as Record<string, unknown>;
     const svcAllow = options.allow?.[svcName] ?? stackAllow;
 
     if (svc['privileged'] === true) {
-      violations.push({ service: svcName, rule: 'privileged', message: 'privileged: true is denied' });
+      violations.push({
+        service: svcName,
+        rule: 'privileged',
+        message: 'privileged: true is denied',
+      });
     }
 
     const netMode = svc['network_mode'];
@@ -180,7 +197,11 @@ export function validateComposePolicy(
       violations.push({ service: svcName, rule: 'ipc', message: 'ipc: host is denied' });
     }
     if (svc['userns_mode'] === 'host') {
-      violations.push({ service: svcName, rule: 'userns_mode', message: 'userns_mode: host is denied' });
+      violations.push({
+        service: svcName,
+        rule: 'userns_mode',
+        message: 'userns_mode: host is denied',
+      });
     }
 
     // security_opt
@@ -267,7 +288,9 @@ export function validateComposePolicy(
           continue;
         }
 
-        if (SENSITIVE_HOST_PATHS.some((s) => normSrc === s || (s !== '/' && isSubpath(s, normSrc)))) {
+        if (
+          SENSITIVE_HOST_PATHS.some((s) => normSrc === s || (s !== '/' && isSubpath(s, normSrc)))
+        ) {
           violations.push({
             service: svcName,
             rule: 'sensitive_mount',

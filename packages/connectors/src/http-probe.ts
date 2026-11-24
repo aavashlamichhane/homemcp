@@ -13,7 +13,10 @@ export interface HttpProbeResult {
 }
 
 export interface HttpProbeConnector {
-  probe(url: string, opts?: { timeoutMs?: number | undefined; followRedirects?: boolean | undefined }): Promise<HttpProbeResult>;
+  probe(
+    url: string,
+    opts?: { timeoutMs?: number | undefined; followRedirects?: boolean | undefined },
+  ): Promise<HttpProbeResult>;
 }
 
 async function inspectTlsCert(hostname: string, port: number): Promise<string | undefined> {

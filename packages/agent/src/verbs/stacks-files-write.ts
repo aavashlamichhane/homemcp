@@ -27,9 +27,9 @@ export function registerStacksFilesWriteVerbs(
   },
 ): void {
   const allStackRoots = [opts.stacksRoot, ...opts.extraStackRoots].filter(Boolean);
-  const allFileRoots = [...new Set([...allStackRoots, opts.mediaRoot, ...opts.allowedFileRoots])].filter(
-    Boolean,
-  );
+  const allFileRoots = [
+    ...new Set([...allStackRoots, opts.mediaRoot, ...opts.allowedFileRoots]),
+  ].filter(Boolean);
 
   registry.register({
     name: 'stacks.apply',
@@ -206,7 +206,11 @@ export function registerStacksFilesWriteVerbs(
           const st = await stat(full);
           return {
             name,
-            type: st.isDirectory() ? ('dir' as const) : st.isFile() ? ('file' as const) : ('other' as const),
+            type: st.isDirectory()
+              ? ('dir' as const)
+              : st.isFile()
+                ? ('file' as const)
+                : ('other' as const),
             size_bytes: st.size,
             mtime: st.mtime.toISOString(),
           };
@@ -246,7 +250,13 @@ export function registerStacksFilesWriteVerbs(
 
   registry.register({
     name: 'files.search',
-    inputSchema: z.object({ root: z.string().min(1), pattern: z.string().min(1), max_results: z.number().int().min(1).max(200).default(50) }).strict(),
+    inputSchema: z
+      .object({
+        root: z.string().min(1),
+        pattern: z.string().min(1),
+        max_results: z.number().int().min(1).max(200).default(50),
+      })
+      .strict(),
     outputSchema: z.object({ matches: z.array(z.string()) }),
     handler: async ({ root, pattern, max_results }) => {
       const { resolved } = await resolveAgainstAllowedRoots(allFileRoots, root);
@@ -302,7 +312,10 @@ export function registerStacksFilesWriteVerbs(
     outputSchema: z.object({ path: z.string(), content: z.string(), size_bytes: z.number() }),
     handler: async ({ path: target }) => {
       if (isDeniedPath(target)) {
-        throw new HomemcpError('POLICY_DENIED', `Reading sensitive/denied file is forbidden: ${target}`);
+        throw new HomemcpError(
+          'POLICY_DENIED',
+          `Reading sensitive/denied file is forbidden: ${target}`,
+        );
       }
       const { resolved } = await resolveAgainstAllowedRoots(allFileRoots, target);
       if (isDeniedPath(resolved)) {
@@ -357,7 +370,13 @@ export function registerStacksFilesWriteVerbs(
 
   registry.register({
     name: 'files.move',
-    inputSchema: z.object({ src: z.string().min(1), dst: z.string().min(1), overwrite: z.boolean().default(false) }).strict(),
+    inputSchema: z
+      .object({
+        src: z.string().min(1),
+        dst: z.string().min(1),
+        overwrite: z.boolean().default(false),
+      })
+      .strict(),
     outputSchema: z.object({ src: z.string(), dst: z.string(), moved: z.boolean() }),
     handler: async ({ src, dst, overwrite }) => {
       const { resolved: safeSrc } = await resolveAgainstAllowedRoots(allFileRoots, src);
@@ -366,7 +385,10 @@ export function registerStacksFilesWriteVerbs(
         throw new HomemcpError('POLICY_DENIED', 'Cannot move denied paths');
       }
       if (!overwrite) {
-        const exists = await stat(safeDst).then(() => true, () => false);
+        const exists = await stat(safeDst).then(
+          () => true,
+          () => false,
+        );
         if (exists) {
           throw new HomemcpError('CONFLICT', `Destination exists and overwrite=false: ${safeDst}`);
         }

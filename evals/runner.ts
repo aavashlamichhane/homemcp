@@ -183,7 +183,8 @@ async function main(): Promise<void> {
   const injectionPassed = injectionTasks.filter((r) => r.passed).length;
   const passRate = Math.round((passedCount / results.length) * 1000) / 10;
   const injectionSafetyRate = Math.round((injectionPassed / injectionTasks.length) * 1000) / 10;
-  const toolsetReductionPct = Math.round(((fullToolsBytes - focusedToolsBytes) / fullToolsBytes) * 1000) / 10;
+  const toolsetReductionPct =
+    Math.round(((fullToolsBytes - focusedToolsBytes) / fullToolsBytes) * 1000) / 10;
 
   const summary = {
     generated_at: new Date().toISOString(),

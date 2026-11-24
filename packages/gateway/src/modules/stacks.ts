@@ -33,7 +33,9 @@ export function loadStackTemplates(templatesDir = resolveTemplatesDir()): StackT
   return dirs.map((d) => {
     const dir = path.join(templatesDir, d.name);
     const compose_hbs = readFileSync(path.join(dir, 'compose.yml.hbs'), 'utf8');
-    const schema = JSON.parse(readFileSync(path.join(dir, 'params.schema.json'), 'utf8')) as StackTemplate['schema'];
+    const schema = JSON.parse(
+      readFileSync(path.join(dir, 'params.schema.json'), 'utf8'),
+    ) as StackTemplate['schema'];
     const readme = existsSync(path.join(dir, 'README.md'))
       ? readFileSync(path.join(dir, 'README.md'), 'utf8')
       : '';
@@ -50,15 +52,21 @@ export function renderTemplateCompose(
   for (const [k, prop] of Object.entries(tpl.schema.properties ?? {})) {
     const val = params[k] ?? prop.default;
     if (val !== undefined) {
-      resolved[k] = typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean' ? val : JSON.stringify(val);
+      resolved[k] =
+        typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean'
+          ? val
+          : JSON.stringify(val);
     }
   }
   resolved['stack_name'] = stackName;
 
-  const composeYaml = tpl.compose_hbs.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key: string) => {
-    const val = resolved[key];
-    return val !== undefined ? String(val) : '';
-  });
+  const composeYaml = tpl.compose_hbs.replace(
+    /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
+    (_m, key: string) => {
+      const val = resolved[key];
+      return val !== undefined ? String(val) : '';
+    },
+  );
   return { composeYaml, resolvedParams: resolved };
 }
 
@@ -83,7 +91,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
     }),
     handler: async () => {
       const scan = await deps.agent.call<{ stacks: Array<Record<string, unknown>> }>('stacks.scan');
-      const metas = deps.db.db.prepare('SELECT * FROM stack_meta').all() as Array<Record<string, unknown>>;
+      const metas = deps.db.db.prepare('SELECT * FROM stack_meta').all() as Array<
+        Record<string, unknown>
+      >;
       const metaMap = new Map(metas.map((m) => [String(m['name']), m]));
 
       const stacks = scan.stacks.map((s) => {
@@ -106,7 +116,8 @@ export function registerStacksModule(deps: GatewayDeps): void {
     name: 'stacks_get',
     toolset: 'stacks',
     tier: 'T0',
-    description: 'Inspects one stack: redacted compose YAML, .env stats, policy findings, and management metadata. Read-only.',
+    description:
+      'Inspects one stack: redacted compose YAML, .env stats, policy findings, and management metadata. Read-only.',
     annotations: {
       title: 'Get Stack Details',
       readOnlyHint: true,
@@ -123,8 +134,7 @@ export function registerStacksModule(deps: GatewayDeps): void {
         throw new HomemcpError('NOT_FOUND', `Stack not found: ${args.name}`);
       }
       const meta = deps.db.db.prepare('SELECT * FROM stack_meta WHERE name = ?').get(args.name) as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       return {
         summary: `Stack ${args.name} (${meta ? 'managed' : 'unmanaged'})`,
         structured: {
@@ -140,7 +150,8 @@ export function registerStacksModule(deps: GatewayDeps): void {
     name: 'stacks_templates_list',
     toolset: 'stacks',
     tier: 'T0',
-    description: 'Lists curated Compose service templates available in the homemcp catalog. Read-only.',
+    description:
+      'Lists curated Compose service templates available in the homemcp catalog. Read-only.',
     annotations: {
       title: 'List Stack Templates',
       readOnlyHint: true,
@@ -176,7 +187,8 @@ export function registerStacksModule(deps: GatewayDeps): void {
     name: 'stacks_template_get',
     toolset: 'stacks',
     tier: 'T0',
-    description: 'Returns a curated template’s parameter schema, README, and Handlebars compose source. Read-only.',
+    description:
+      'Returns a curated template’s parameter schema, README, and Handlebars compose source. Read-only.',
     annotations: {
       title: 'Get Stack Template',
       readOnlyHint: true,
@@ -202,7 +214,8 @@ export function registerStacksModule(deps: GatewayDeps): void {
     name: 'stacks_validate',
     toolset: 'stacks',
     tier: 'T0',
-    description: 'Validates candidate Docker Compose YAML against homemcp security policy without writing any files. Read-only.',
+    description:
+      'Validates candidate Docker Compose YAML against homemcp security policy without writing any files. Read-only.',
     annotations: {
       title: 'Validate Compose Policy',
       readOnlyHint: true,
@@ -293,7 +306,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
         diff: yaml,
         sideEffects: [
           `Writes ${stackDir}/docker-compose.yml`,
-          ...(secretKeys.length > 0 ? [`Generates secrets (${secretKeys.join(', ')}) into 0600 .env (not shown to LLM)`] : []),
+          ...(secretKeys.length > 0
+            ? [`Generates secrets (${secretKeys.join(', ')}) into 0600 .env (not shown to LLM)`]
+            : []),
           ...(args.start ? ['Pulls container image(s) and runs docker compose up -d'] : []),
         ],
         rollback: [`Run stacks_remove for "${args.name}" (moves to .trash)`],
@@ -412,7 +427,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
     inputSchema: z.object({ stack_dir: z.string().min(1) }).strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args) => {
-      const res = await deps.agent.call<Record<string, unknown>>('stacks.up', { stack_dir: args.stack_dir });
+      const res = await deps.agent.call<Record<string, unknown>>('stacks.up', {
+        stack_dir: args.stack_dir,
+      });
       return {
         summary: `Started stack at ${args.stack_dir}`,
         structured: res,
@@ -432,7 +449,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
       idempotentHint: true,
       openWorldHint: false,
     },
-    inputSchema: z.object({ stack_dir: z.string().min(1), plan_id: z.string().optional() }).strict(),
+    inputSchema: z
+      .object({ stack_dir: z.string().min(1), plan_id: z.string().optional() })
+      .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!args.plan_id) {
@@ -484,7 +503,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
         };
       }
       const p = gate.plan.payload as { stack_dir: string };
-      const res = await deps.agent.call<Record<string, unknown>>('stacks.down', { stack_dir: p.stack_dir });
+      const res = await deps.agent.call<Record<string, unknown>>('stacks.down', {
+        stack_dir: p.stack_dir,
+      });
       deps.plans.markApplied(gate.plan.id);
       return {
         summary: `Stopped stack ${p.stack_dir}`,
@@ -508,7 +529,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
       idempotentHint: false,
       openWorldHint: false,
     },
-    inputSchema: z.object({ stack_dir: z.string().min(1), plan_id: z.string().optional() }).strict(),
+    inputSchema: z
+      .object({ stack_dir: z.string().min(1), plan_id: z.string().optional() })
+      .strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
       if (!args.plan_id) {
@@ -560,8 +583,12 @@ export function registerStacksModule(deps: GatewayDeps): void {
         };
       }
       const p = gate.plan.payload as { stack_dir: string };
-      const res = await deps.agent.call<Record<string, unknown>>('stacks.remove', { stack_dir: p.stack_dir });
-      deps.db.db.prepare('DELETE FROM stack_meta WHERE name = ?').run(path.posix.basename(p.stack_dir));
+      const res = await deps.agent.call<Record<string, unknown>>('stacks.remove', {
+        stack_dir: p.stack_dir,
+      });
+      deps.db.db
+        .prepare('DELETE FROM stack_meta WHERE name = ?')
+        .run(path.posix.basename(p.stack_dir));
       deps.plans.markApplied(gate.plan.id);
       return {
         summary: `Moved stack ${p.stack_dir} to trash`,
@@ -576,7 +603,8 @@ export function registerStacksModule(deps: GatewayDeps): void {
     name: 'stacks_adopt',
     toolset: 'stacks',
     tier: 'T2',
-    description: 'Registers an existing compose directory on disk under homemcp management (plan-first).',
+    description:
+      'Registers an existing compose directory on disk under homemcp management (plan-first).',
     annotations: {
       title: 'Adopt Existing Stack',
       readOnlyHint: false,
@@ -587,7 +615,9 @@ export function registerStacksModule(deps: GatewayDeps): void {
     inputSchema: z.object({ name: z.string().min(1), plan_id: z.string().optional() }).strict(),
     outputSchema: z.record(z.string(), z.unknown()),
     handler: async (args, ctx) => {
-      const scan = await deps.agent.call<{ stacks: Array<{ name: string; dir: string; root: string }> }>('stacks.scan');
+      const scan = await deps.agent.call<{
+        stacks: Array<{ name: string; dir: string; root: string }>;
+      }>('stacks.scan');
       const stack = scan.stacks.find((s) => s.name === args.name);
       if (!stack) {
         throw new HomemcpError('NOT_FOUND', `Stack not found on disk: ${args.name}`);

@@ -152,7 +152,11 @@ export function createDefaultMockConfig(): HomemcpConfig {
     modules: {
       docker: { socketProxy: 'http://127.0.0.1:2375' },
       network: {
-        npm: { url: 'http://192.0.2.10:81', email: 'mcp@example.com', password: 'mock-npm-password' },
+        npm: {
+          url: 'http://192.0.2.10:81',
+          email: 'mcp@example.com',
+          password: 'mock-npm-password',
+        },
         cloudflare: {
           accountId: 'acc-mock',
           tunnelId: 'tun-mock',
