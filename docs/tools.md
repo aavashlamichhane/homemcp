@@ -2,7 +2,7 @@
 
 > Auto-generated from `HomemcpRegistry` via `pnpm docs:generate`. Do not edit by hand.
 
-**Totals:** 126 tools across 15 toolsets, 9 resources, 8 prompts.
+**Totals:** 133 tools across 15 toolsets, 9 resources, 8 prompts.
 
 ## Toolsets Summary
 
@@ -22,7 +22,7 @@
 | `network` | 14 | T0, T2, T3 |
 | `stacks` | 11 | T0, T1, T2, T3 |
 | `system` | 13 | T0, T2, T3 |
-| `vaultwarden` | 1 | T0 |
+| `vaultwarden` | 8 | T0, T1, T2, T3 |
 
 ## Tools by Toolset
 
@@ -225,6 +225,13 @@
 
 | Tool | Tier | Scope | Hints (R/D/I/O) | Description |
 |---|---|---|---|---|
+| `vaultwarden_backup_prune_apply` | T2 | `homemcp:admin` | -/D/-/O | Executes a confirmed Vaultwarden retention prune plan via homemcpd. |
+| `vaultwarden_backup_prune_plan` | T0 | `homemcp:read` | R/-/I/O | Runs a dry-run retention check (`restic forget --dry-run`) on Vaultwarden snapshots and returns a plan_id to confirm pruning old snapshots. |
+| `vaultwarden_backup_restore_staging` | T3 | `homemcp:admin` | -/-/-/- | Restores a Vaultwarden snapshot strictly to an isolated staging directory for inspection or manual recovery (never overwrites live Vaultwarden data). Requires T3 passkey confirmation. |
+| `vaultwarden_backup_run` | T1 | `homemcp:operate` | -/-/-/O | Runs an immediate consistent Vaultwarden backup (`db.sqlite3`, RSA keys, config, attachments, sends) to R2 via homemcpd as a tracked job. |
+| `vaultwarden_backup_snapshots` | T0 | `homemcp:read` | R/-/I/- | Lists Restic encrypted snapshots specifically for Vaultwarden (newest first) with snapshot IDs and timestamps. Read-only. |
+| `vaultwarden_backup_status` | T0 | `homemcp:read` | R/-/I/- | Reports dedicated Vaultwarden backup freshness vs RPO, snapshot count, latest restore-test SQLite cipher check, schedule (every 6h), retention policy, and repo budget. Read-only. Never reads vault contents. |
+| `vaultwarden_backup_test` | T1 | `homemcp:operate` | -/-/I/- | Restores a Vaultwarden snapshot into a temporary directory, runs SQLite PRAGMA integrity_check, compares cipher/user counts against the live DB, and cleans up. |
 | `vaultwarden_health` | T0 | `homemcp:read` | R/-/I/O | Checks Vaultwarden /alive endpoint, version vs upstream release, signups/admin-panel disabled flags, DOMAIN match against publicUrl, and backup freshness. Never reads vault contents. Read-only. Example: vaultwarden_health(). |
 
 ## Resources

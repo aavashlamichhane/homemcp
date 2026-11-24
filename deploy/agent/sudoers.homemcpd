@@ -11,4 +11,8 @@ homemcpd ALL=(root) NOPASSWD: /usr/local/sbin/homemcp-backup run vaultwarden, \
   /usr/local/sbin/homemcp-backup run userdata, \
   /usr/local/sbin/homemcp-backup run all, \
   /usr/local/sbin/homemcp-backup maint, \
-  /usr/local/sbin/homemcp-backup restore-test vaultwarden
+  /usr/local/sbin/homemcp-backup restore-test vaultwarden, \
+  /usr/local/sbin/homemcp-backup restore-test vaultwarden *, \
+  /usr/local/sbin/homemcp-backup restore-staging *, \
+  /usr/local/sbin/homemcp-backup prune-set vaultwarden, \
+  /usr/local/sbin/homemcp-backup prune-set vaultwarden --dry-run

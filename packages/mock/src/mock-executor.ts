@@ -25,6 +25,8 @@ export class MockExecutor implements AgentExecutor {
         'backup.run',
         'backup.verify',
         'backup.restore_test',
+        'backup.restore_staging',
+        'backup.prune_set',
         'docker.container_action',
         'docker.compose_update',
         'docker.prune',
@@ -258,7 +260,7 @@ export class MockExecutor implements AgentExecutor {
         const targets = set === 'all' ? ['vaultwarden', 'configs'] : [set];
         const now = new Date().toISOString();
         for (const t of targets) {
-          const snapId = `snap_${t}_${Date.now().toString(36).slice(-4)}`;
+          const snapId = `${Date.now().toString(16).slice(-6)}${(this.state.backupSnapshots.length + 10).toString(16).slice(-2)}`;
           this.state.backupStatus[t] = {
             last_status: 'success',
             last_success: now,
@@ -279,6 +281,7 @@ export class MockExecutor implements AgentExecutor {
         return { exit_code: 0, output: 'restic check passed: no errors' };
 
       case 'backup.restore_test': {
+        const snapshotId = typeof params['snapshot_id'] === 'string' ? params['snapshot_id'] : 'latest';
         const now = new Date().toISOString();
         const prev = (this.state.backupStatus['vaultwarden'] as Record<string, unknown> | undefined) ?? {};
         this.state.backupStatus['vaultwarden'] = {
@@ -290,7 +293,44 @@ export class MockExecutor implements AgentExecutor {
             live_ciphers: 142,
           },
         };
-        return { set: 'vaultwarden', exit_code: 0, output: 'RESTORE_TEST=ok restored_ciphers=142 live_ciphers=142' };
+        return {
+          set: 'vaultwarden',
+          exit_code: 0,
+          output: `RESTORE_TEST=ok snapshot=${snapshotId} restored_ciphers=142 live_ciphers=142`,
+        };
+      }
+
+      case 'backup.restore_staging': {
+        const set = typeof params['set'] === 'string' ? params['set'] : 'vaultwarden';
+        const snapshotId = typeof params['snapshot_id'] === 'string' ? params['snapshot_id'] : 'latest';
+        const subdir = typeof params['staging_subdir'] === 'string' ? params['staging_subdir'] : 'manual-restore';
+        if (subdir.includes('..') || !/^[A-Za-z0-9_-]{1,40}$/.test(subdir)) {
+          throw new HomemcpError('POLICY_DENIED', `Invalid staging_subdir: ${subdir}`);
+        }
+        const stagingTarget = `/var/lib/homemcp/backup/staging-restore/${subdir}`;
+        return {
+          set,
+          snapshot_id: snapshotId,
+          staging_target: stagingTarget,
+          exit_code: 0,
+          output: `STAGING_DIR=${stagingTarget} INTEGRITY=${set === 'vaultwarden' ? 'ok' : 'n/a'}`,
+        };
+      }
+
+      case 'backup.prune_set': {
+        const set = typeof params['set'] === 'string' ? params['set'] : 'vaultwarden';
+        const dryRun = params['dry_run'] !== false;
+        const matching = this.state.backupSnapshots.filter((s) =>
+          Array.isArray(s['tags']) && (s['tags'] as string[]).includes(`set=${set}`),
+        );
+        return {
+          set,
+          dry_run: dryRun,
+          exit_code: 0,
+          output: dryRun
+            ? `DRY-RUN: evaluated ${matching.length} ${set} snapshot(s) against retention policy (0 expired in fixture)`
+            : `PRUNED: retained ${matching.length} ${set} snapshot(s) under retention policy`,
+        };
       }
 
       case 'files.read': {

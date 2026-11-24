@@ -282,7 +282,8 @@ export function registerBackupModule(deps: GatewayDeps): void {
     inputSchema: z
       .object({
         set: z.enum(['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata']),
-        staging_subdir: z.string().regex(/^[A-Za-z0-9_.-]+$/).default('manual-restore'),
+        snapshot_id: z.string().regex(/^(?:latest|[a-f0-9]{6,64})$/).default('latest'),
+        staging_subdir: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).default('manual-restore'),
         plan_id: z.string().optional(),
       })
       .strict(),
@@ -296,9 +297,14 @@ export function registerBackupModule(deps: GatewayDeps): void {
         const plan = deps.plans.createPlan({
           tool: 'backup_restore',
           tier: 'T3',
-          payload: { set: args.set, staging_target: stagingTarget },
-          summary: `Restore set "${args.set}" strictly to staging path ${stagingTarget}`,
-          diff: `restore ${args.set} -> ${stagingTarget} (live data untouched)`,
+          payload: {
+            set: args.set,
+            snapshot_id: args.snapshot_id,
+            staging_subdir: args.staging_subdir,
+            staging_target: stagingTarget,
+          },
+          summary: `Restore set "${args.set}" (snapshot ${args.snapshot_id}) strictly to staging path ${stagingTarget}`,
+          diff: `restore ${args.set}@${args.snapshot_id} -> ${stagingTarget} (live data untouched)`,
           sideEffects: [`Writes restored snapshot files into ${stagingTarget}`],
           rollback: [`Remove ${stagingTarget} after inspection`],
           createdBy: ctx.auth.subject,
@@ -340,17 +346,31 @@ export function registerBackupModule(deps: GatewayDeps): void {
           confirmationId: gate.confirmationId,
         };
       }
-      const p = gate.plan.payload as { set: string; staging_target: string };
-      const res = await deps.agent.call<{ exit_code: number; output: string }>('backup.restore_test', {
-        set: 'vaultwarden',
+      const p = gate.plan.payload as {
+        set: string;
+        snapshot_id: string;
+        staging_subdir: string;
+        staging_target: string;
+      };
+      const res = await deps.agent.call<{
+        set: string;
+        snapshot_id: string;
+        staging_target: string;
+        exit_code: number;
+        output: string;
+      }>('backup.restore_staging', {
+        set: p.set,
+        snapshot_id: p.snapshot_id,
+        staging_subdir: p.staging_subdir,
       });
       deps.plans.markApplied(gate.plan.id);
       return {
-        summary: `Restored "${p.set}" to staging ${p.staging_target}`,
+        summary: `Restored "${p.set}" (${p.snapshot_id}) to staging ${p.staging_target}`,
         structured: {
           applied: true,
           status: 'applied',
           staging_target: p.staging_target,
+          snapshot_id: p.snapshot_id,
           exit_code: res.exit_code,
           output: res.output,
         },

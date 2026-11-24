@@ -194,7 +194,14 @@ describe('P1 Gateway MCP server (mock mode)', () => {
     const listResp = await client.request('tools/list');
     const tools = (listResp['result'] as { tools: Array<{ name: string }> }).tools;
     const names = tools.map((t) => t.name).sort();
-    expect(names).toEqual(['backup_snapshots', 'backup_status', 'vaultwarden_health']);
+    expect(names).toEqual([
+      'backup_snapshots',
+      'backup_status',
+      'vaultwarden_backup_prune_plan',
+      'vaultwarden_backup_snapshots',
+      'vaultwarden_backup_status',
+      'vaultwarden_health',
+    ]);
 
     await clientTransport.close();
     await serverTransport.close();

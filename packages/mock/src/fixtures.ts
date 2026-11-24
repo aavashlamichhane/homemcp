@@ -419,7 +419,7 @@ export function createMockState(): MockState {
         last_status: 'success',
         last_success: new Date(Date.now() - 2 * 3600_000).toISOString(),
         last_bytes_added: 524288,
-        last_snapshot: 'snapvw01',
+        last_snapshot: 'a1b2c3d4',
         last_restore_test: {
           time: new Date(Date.now() - 12 * 3600_000).toISOString(),
           status: 'ok',
@@ -431,12 +431,12 @@ export function createMockState(): MockState {
         last_status: 'success',
         last_success: new Date(Date.now() - 6 * 3600_000).toISOString(),
         last_bytes_added: 2048000,
-        last_snapshot: 'snapcfg1',
+        last_snapshot: 'e5f60718',
       },
     },
     backupSnapshots: [
-      { id: 'snapvw01', time: new Date(Date.now() - 2 * 3600_000).toISOString(), tags: ['set=vaultwarden'], paths: ['/var/lib/homemcp/backup/staging/vaultwarden'] },
-      { id: 'snapcfg1', time: new Date(Date.now() - 6 * 3600_000).toISOString(), tags: ['set=configs'], paths: ['/home/homelab/docker-containers'] },
+      { id: 'a1b2c3d4', time: new Date(Date.now() - 2 * 3600_000).toISOString(), tags: ['set=vaultwarden'], paths: ['/var/lib/homemcp/backup/staging/vaultwarden'] },
+      { id: 'e5f60718', time: new Date(Date.now() - 6 * 3600_000).toISOString(), tags: ['set=configs'], paths: ['/home/homelab/docker-containers'] },
     ],
     backupStats: { total_size: 1_250_000_000, total_file_count: 4200 },
     files: {
