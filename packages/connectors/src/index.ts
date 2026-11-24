@@ -9,3 +9,7 @@ export * from './http-probe.js';
 export * from './subsonic.js';
 export * from './track-matcher.js';
 export * from './naviload.js';
+export * from './jellyfin.js';
+export * from './qbittorrent.js';
+export * from './ntfy.js';
+export * from './healthchecks.js';

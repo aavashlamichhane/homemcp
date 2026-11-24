@@ -1,10 +1,15 @@
 import type {
   CloudflareConnector,
   DockerConnector,
+  HealthchecksConnector,
   HttpProbeConnector,
   HttpProbeResult,
+  JellyfinConnector,
   NaviloadConnector,
   NpmConnector,
+  NtfyConnector,
+  NtfyMessage,
+  QbittorrentConnector,
   RegistryConnector,
   SubsonicConnector,
   SubsonicPlaylist,
@@ -525,5 +530,152 @@ export class MockNaviloadConnector implements NaviloadConnector {
     }
     trk.status = 'queued';
     return Promise.resolve({ ok: true, track_id: trackId, status: 'queued' });
+  }
+}
+
+export class MockJellyfinConnector implements JellyfinConnector {
+  public constructor(private readonly state: MockState) {}
+
+  public getHealth() {
+    return Promise.resolve({ ok: true, status_code: 200 });
+  }
+
+  public getSystemInfo() {
+    return Promise.resolve({
+      ServerName: 'homelab-01-jellyfin',
+      Version: '10.11.8',
+      Id: 'jf-mock-1',
+      OperatingSystem: 'Linux',
+      HasPendingRestart: false,
+    });
+  }
+
+  public getSessions() {
+    return Promise.resolve([...this.state.jellyfinSessions]);
+  }
+
+  public getLibraries() {
+    return Promise.resolve([...this.state.jellyfinLibraries]);
+  }
+
+  public searchItems(opts: {
+    searchTerm?: string | undefined;
+    includeItemTypes?: string | undefined;
+    limit?: number | undefined;
+  }) {
+    const q = (opts.searchTerm ?? '').toLowerCase();
+    const filtered = this.state.jellyfinItems.filter((item) => {
+      if (q && !item.Name.toLowerCase().includes(q)) return false;
+      if (opts.includeItemTypes && !opts.includeItemTypes.split(',').includes(item.Type)) return false;
+      return true;
+    });
+    return Promise.resolve({
+      Items: filtered.slice(0, opts.limit ?? 50),
+      TotalRecordCount: filtered.length,
+    });
+  }
+
+  public getScheduledTasks() {
+    return Promise.resolve([...this.state.jellyfinTasks]);
+  }
+
+  public runScheduledTask(taskId: string): Promise<void> {
+    const task = this.state.jellyfinTasks.find((t) => t.Id === taskId);
+    if (!task) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `Jellyfin task not found: ${taskId}`));
+    }
+    task.LastExecutionResult = {
+      StartTimeUtc: new Date().toISOString(),
+      EndTimeUtc: new Date().toISOString(),
+      Status: 'Completed',
+    };
+    return Promise.resolve();
+  }
+
+  public getActivityLog(limit = 50) {
+    return Promise.resolve(this.state.jellyfinActivity.slice(0, limit));
+  }
+
+  public getUsers() {
+    return Promise.resolve([{ Id: 'u1', Name: 'owner', Policy: { IsAdministrator: true } }]);
+  }
+}
+
+export class MockQbittorrentConnector implements QbittorrentConnector {
+  public constructor(private readonly state: MockState) {}
+
+  public getTransferInfo() {
+    return Promise.resolve({
+      dl_info_speed: 2_400_000,
+      up_info_speed: 512_000,
+      dl_info_data: 10_000_000_000,
+      up_info_data: 15_000_000_000,
+      connection_status: 'connected',
+    });
+  }
+
+  public listTorrents(filter?: string) {
+    const list = this.state.qbitTorrents.filter((t) => {
+      if (!filter || filter === 'all') return true;
+      if (filter === 'active') return t.dlspeed > 0 || t.upspeed > 0;
+      if (filter === 'stalled') return t.state.includes('stalled');
+      return t.state === filter;
+    });
+    return Promise.resolve([...list]);
+  }
+
+  public addTorrent(opts: { urls: readonly string[]; category?: string | undefined; savepath?: string | undefined }) {
+    for (const url of opts.urls) {
+      const hash = `mock${(this.state.qbitTorrents.length + 1).toString(16).padStart(36, '0')}`;
+      this.state.qbitTorrents.push({
+        hash,
+        name: url.startsWith('magnet:') ? 'Magnet Download' : url.split('/').pop() ?? 'Download',
+        size: 1_500_000_000,
+        progress: 0,
+        dlspeed: 0,
+        upspeed: 0,
+        eta: 3600,
+        state: 'downloading',
+        ratio: 0,
+        category: opts.category ?? '',
+        save_path: opts.savepath ?? '/mnt/storage/media',
+      });
+    }
+    return Promise.resolve();
+  }
+
+  public controlTorrents(action: 'pause' | 'resume' | 'recheck', hashes: readonly string[]) {
+    for (const t of this.state.qbitTorrents) {
+      if (hashes.includes(t.hash)) {
+        t.state = action === 'pause' ? 'pausedDL' : action === 'resume' ? 'downloading' : 'checkingDL';
+      }
+    }
+    return Promise.resolve();
+  }
+
+  public deleteTorrents(hashes: readonly string[], _deleteFiles: boolean) {
+    this.state.qbitTorrents = this.state.qbitTorrents.filter((t) => !hashes.includes(t.hash));
+    return Promise.resolve();
+  }
+}
+
+export class MockNtfyConnector implements NtfyConnector {
+  public constructor(private readonly state: MockState) {}
+
+  public send(msg: NtfyMessage): Promise<void> {
+    if (!this.state.ntfyOnline) {
+      return Promise.reject(new HomemcpError('UPSTREAM_UNAVAILABLE', 'ntfy offline (simulated outage)'));
+    }
+    this.state.ntfySent.push(msg);
+    return Promise.resolve();
+  }
+}
+
+export class MockHealthchecksConnector implements HealthchecksConnector {
+  public constructor(private readonly state: MockState) {}
+
+  public ping(state: 'ok' | 'start' | 'fail' = 'ok'): Promise<boolean> {
+    this.state.healthchecksPings.push(state);
+    return Promise.resolve(true);
   }
 }

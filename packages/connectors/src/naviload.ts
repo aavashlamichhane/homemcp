@@ -40,7 +40,7 @@ export interface NaviloadConnector {
     trackId: string;
     policy: 'keep_youtube' | 'suggestion' | 'manual';
     suggestionIndex?: number | undefined;
-    manualTags?: { title?: string; artist?: string; album?: string } | undefined;
+    manualTags?: { title?: string | undefined; artist?: string | undefined; album?: string | undefined } | undefined;
     artworkPolicy?: 'db_then_youtube' | 'youtube' | undefined;
   }): Promise<Record<string, unknown>>;
   confirmTrack(trackId: string): Promise<Record<string, unknown>>;
@@ -119,7 +119,7 @@ export class HttpNaviloadConnector implements NaviloadConnector {
     trackId: string;
     policy: 'keep_youtube' | 'suggestion' | 'manual';
     suggestionIndex?: number | undefined;
-    manualTags?: { title?: string; artist?: string; album?: string } | undefined;
+    manualTags?: { title?: string | undefined; artist?: string | undefined; album?: string | undefined } | undefined;
     artworkPolicy?: 'db_then_youtube' | 'youtube' | undefined;
   }): Promise<Record<string, unknown>> {
     return fetchJson<Record<string, unknown>>(

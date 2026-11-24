@@ -4,11 +4,17 @@ import type {
   CloudflareTunnelConfig,
   DockerContainerSummary,
   DockerInspectSanitized,
+  JellyfinItem,
+  JellyfinLibrary,
+  JellyfinScheduledTask,
+  JellyfinSession,
   NaviloadSearchCandidate,
   NaviloadTrack,
   NpmAccessList,
   NpmCertificate,
   NpmProxyHost,
+  NtfyMessage,
+  QbitTorrent,
   SubsonicPlaylist,
   SubsonicSong,
 } from '@homemcp/connectors';
@@ -50,6 +56,15 @@ export interface MockState {
   musicPlaylists: SubsonicPlaylist[];
   naviloadTracks: NaviloadTrack[];
   naviloadCandidates: Record<string, NaviloadSearchCandidate[]>;
+  jellyfinSessions: JellyfinSession[];
+  jellyfinLibraries: JellyfinLibrary[];
+  jellyfinItems: JellyfinItem[];
+  jellyfinTasks: JellyfinScheduledTask[];
+  jellyfinActivity: Array<Record<string, unknown>>;
+  qbitTorrents: QbitTorrent[];
+  ntfyOnline: boolean;
+  ntfySent: NtfyMessage[];
+  healthchecksPings: Array<'ok' | 'start' | 'fail'>;
 }
 
 export function createMockState(): MockState {
@@ -540,5 +555,82 @@ export function createMockState(): MockState {
         },
       ],
     },
+    jellyfinSessions: [
+      {
+        Id: 'jf-sess-1',
+        UserName: 'owner',
+        Client: 'Jellyfin Web',
+        DeviceName: 'Laptop',
+        NowPlayingItem: { Id: 'jf-m1', Name: 'Sample Sci-Fi Movie', Type: 'Movie' },
+        PlayState: { IsPaused: false, PlayMethod: 'Transcode' },
+        TranscodingInfo: {
+          VideoCodec: 'h264',
+          AudioCodec: 'aac',
+          IsVideoDirect: false,
+          IsAudioDirect: true,
+          TranscodeReasons: ['ContainerNotSupported'],
+          HardwareAccelerationType: 'vaapi',
+        },
+      },
+    ],
+    jellyfinLibraries: [
+      { Name: 'Movies', CollectionType: 'movies', ItemId: 'lib-movies', Locations: ['/mnt/storage/media/jellyfin/movies'], RefreshProgress: 100, RefreshStatus: 'Idle' },
+      { Name: 'Series', CollectionType: 'tvshows', ItemId: 'lib-series', Locations: ['/mnt/storage/media/jellyfin/series'], RefreshProgress: 100, RefreshStatus: 'Idle' },
+    ],
+    jellyfinItems: [
+      {
+        Id: 'jf-m1',
+        Name: 'Sample Sci-Fi Movie',
+        Type: 'Movie',
+        ProductionYear: 2023,
+        Path: '/mnt/storage/media/jellyfin/movies/Sample Sci-Fi Movie (2023)/Sample Sci-Fi Movie (2023).mkv',
+        DateCreated: new Date(Date.now() - 86_400_000).toISOString(),
+        ProviderIds: { Tmdb: '12345' },
+        ImageTags: { Primary: 'tag-1' },
+      },
+      {
+        Id: 'jf-m2',
+        Name: 'Unidentified Film',
+        Type: 'Movie',
+        Path: '/mnt/storage/media/jellyfin/movies/random_rip_1080p.mkv',
+        DateCreated: new Date(Date.now() - 172_800_000).toISOString(),
+        ProviderIds: {},
+        ImageTags: {},
+      },
+    ],
+    jellyfinTasks: [
+      {
+        Id: 'task-scan-lib',
+        Name: 'Scan Media Library',
+        State: 'Idle',
+        Category: 'Library',
+        LastExecutionResult: {
+          StartTimeUtc: new Date(Date.now() - 7200_000).toISOString(),
+          EndTimeUtc: new Date(Date.now() - 7100_000).toISOString(),
+          Status: 'Completed',
+        },
+      },
+    ],
+    jellyfinActivity: [
+      { Id: 1, Name: 'AuthenticationSucceeded', UserId: 'u1', Date: new Date().toISOString(), Severity: 'Information' },
+    ],
+    qbitTorrents: [
+      {
+        hash: 'aabbccddeeff0011223344556677889900112233',
+        name: 'Ubuntu-24.04.5-live-server-amd64.iso',
+        size: 2_600_000_000,
+        progress: 1.0,
+        dlspeed: 0,
+        upspeed: 512_000,
+        eta: 8640000,
+        state: 'uploading',
+        ratio: 1.4,
+        category: 'movies',
+        save_path: '/mnt/storage/media/jellyfin/movies',
+      },
+    ],
+    ntfyOnline: true,
+    ntfySent: [],
+    healthchecksPings: [],
   };
 }
