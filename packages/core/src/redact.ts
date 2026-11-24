@@ -147,12 +147,15 @@ export class Redactor {
       },
     );
 
-    // Layer 3b: Cloudflare tunnel CLI --token flag and base64 tunnel JSON
-    text = text.replace(/(--token(?:=|\s+))(['"]?)([A-Za-z0-9_=-]{20,})\2/g, (_m, p1: string, q: string, tok: string) => {
-      if (SAFE_EXACT_PLACEHOLDER_RE.test(tok)) return `${p1}${q}${tok}${q}`;
-      count++;
-      return `${p1}${q}${marker('cf_tunnel', tok)}${q}`;
-    });
+    // Layer 3b: CLI secret flags (--token, --password, --secret, --api-key) and base64 tunnel JSON
+    text = text.replace(
+      /(--(?:token|password|secret|api-key)(?:=|\s+))(['"]?)([^\s'"]{6,})\2/gi,
+      (_m, p1: string, q: string, tok: string) => {
+        if (SAFE_EXACT_PLACEHOLDER_RE.test(tok)) return `${p1}${q}${tok}${q}`;
+        count++;
+        return `${p1}${q}${marker('cli_flag', tok)}${q}`;
+      },
+    );
     text = text.replace(/\beyJhIjoi[A-Za-z0-9_=-]{20,}\b/g, (tok) => {
       count++;
       return marker('cf_tunnel', tok);
