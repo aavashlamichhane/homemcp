@@ -2,7 +2,9 @@ import { McpServer } from '@modelcontextprotocol/server';
 import {
   HttpCloudflareConnector,
   HttpDockerConnector,
+  HttpNaviloadConnector,
   HttpNpmConnector,
+  HttpSubsonicConnector,
   HttpUnixAgentClient,
   HttpVaultwardenConnector,
   NodeHttpProbeConnector,
@@ -11,8 +13,10 @@ import {
   type CloudflareConnector,
   type DockerConnector,
   type HttpProbeConnector,
+  type NaviloadConnector,
   type NpmConnector,
   type RegistryConnector,
+  type SubsonicConnector,
   type VaultwardenConnector,
 } from '@homemcp/connectors';
 import {
@@ -30,17 +34,22 @@ import {
   MockDockerConnector,
   MockExecutor,
   MockHttpProbeConnector,
+  MockNaviloadConnector,
   MockNpmConnector,
   MockRegistryConnector,
+  MockSubsonicConnector,
   MockVaultwardenConnector,
 } from '@homemcp/mock';
 import { HomemcpDb } from '../db/database.js';
 import { PatManager } from '../auth/pats.js';
+import { JobRunner } from '../jobs/runner.js';
 import { registerAppsModule } from '../modules/apps.js';
 import { registerAuthModule } from '../modules/auth.js';
 import { registerBackupModule } from '../modules/backup.js';
 import { registerCoreModule } from '../modules/core.js';
 import { registerDockerModule } from '../modules/docker.js';
+import { registerMusicModule } from '../modules/music.js';
+import { registerNaviloadModule } from '../modules/naviload.js';
 import { registerNetworkModule } from '../modules/network.js';
 import { registerSystemModule } from '../modules/system.js';
 import { registerVaultwardenModule } from '../modules/vaultwarden.js';
@@ -54,12 +63,15 @@ export interface GatewayDeps {
   redactor: Redactor;
   registry: HomemcpRegistry;
   pats: PatManager;
+  jobs: JobRunner;
   agent: AgentExecutor;
   docker?: DockerConnector | undefined;
   ociRegistry: RegistryConnector;
   npm?: NpmConnector | undefined;
   cloudflare?: CloudflareConnector | undefined;
   vaultwarden?: VaultwardenConnector | undefined;
+  subsonic?: SubsonicConnector | undefined;
+  naviload?: NaviloadConnector | undefined;
   httpProbe: HttpProbeConnector;
   isMock: boolean;
   version: string;
@@ -170,6 +182,8 @@ export function createGatewayDeps(opts: {
   const db = new HomemcpDb(opts.dbPath ?? (isMock ? ':memory:' : '/data/homemcp.db'));
   const registry = new HomemcpRegistry();
   const pats = new PatManager(db);
+  const jobs = new JobRunner(db, redactor);
+  jobs.reconcileOnBoot();
 
   let agent: AgentExecutor;
   let docker: DockerConnector | undefined;
@@ -177,6 +191,8 @@ export function createGatewayDeps(opts: {
   let npm: NpmConnector | undefined;
   let cloudflare: CloudflareConnector | undefined;
   let vaultwarden: VaultwardenConnector | undefined;
+  let subsonic: SubsonicConnector | undefined;
+  let naviload: NaviloadConnector | undefined;
   let httpProbe: HttpProbeConnector;
 
   if (isMock) {
@@ -187,6 +203,8 @@ export function createGatewayDeps(opts: {
     npm = new MockNpmConnector(state);
     cloudflare = new MockCloudflareConnector(state);
     vaultwarden = new MockVaultwardenConnector();
+    subsonic = new MockSubsonicConnector(state);
+    naviload = new MockNaviloadConnector(state);
     httpProbe = new MockHttpProbeConnector();
   } else {
     agent = new HttpUnixAgentClient({
@@ -207,6 +225,12 @@ export function createGatewayDeps(opts: {
     vaultwarden = config.modules.vaultwarden
       ? new HttpVaultwardenConnector(config.modules.vaultwarden)
       : undefined;
+    subsonic = config.modules.navidrome
+      ? new HttpSubsonicConnector(config.modules.navidrome)
+      : undefined;
+    naviload = config.modules.naviload
+      ? new HttpNaviloadConnector(config.modules.naviload)
+      : undefined;
     httpProbe = new NodeHttpProbeConnector();
   }
 
@@ -216,12 +240,15 @@ export function createGatewayDeps(opts: {
     redactor,
     registry,
     pats,
+    jobs,
     agent,
     docker,
     ociRegistry,
     npm,
     cloudflare,
     vaultwarden,
+    subsonic,
+    naviload,
     httpProbe,
     isMock,
     version: opts.version ?? '0.1.0',
@@ -234,6 +261,8 @@ export function createGatewayDeps(opts: {
   registerAppsModule(deps);
   registerBackupModule(deps);
   registerVaultwardenModule(deps);
+  registerMusicModule(deps);
+  registerNaviloadModule(deps);
   registerAuthModule(deps, { patManager: pats, publicUrl: config.server.publicUrl });
   registerResources(deps);
   registerPrompts(deps);

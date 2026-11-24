@@ -4,9 +4,13 @@ import type {
   CloudflareTunnelConfig,
   DockerContainerSummary,
   DockerInspectSanitized,
+  NaviloadSearchCandidate,
+  NaviloadTrack,
   NpmAccessList,
   NpmCertificate,
   NpmProxyHost,
+  SubsonicPlaylist,
+  SubsonicSong,
 } from '@homemcp/connectors';
 
 export interface MockState {
@@ -42,6 +46,10 @@ export interface MockState {
   backupSnapshots: Array<Record<string, unknown>>;
   backupStats: Record<string, unknown>;
   files: Record<string, string>;
+  musicSongs: SubsonicSong[];
+  musicPlaylists: SubsonicPlaylist[];
+  naviloadTracks: NaviloadTrack[];
+  naviloadCandidates: Record<string, NaviloadSearchCandidate[]>;
 }
 
 export function createMockState(): MockState {
@@ -418,6 +426,119 @@ export function createMockState(): MockState {
       '/home/homelab/docker-containers/navidrome/docker-compose.yml':
         'services:\n  navidrome:\n    image: deluan/navidrome:0.63.2\n',
       '/home/homelab/docker-containers/navidrome/.env': 'DOWNLOADER_PASSWORD=mock-secret-pass\n',
+    },
+    musicSongs: [
+      {
+        id: 'song-1',
+        title: 'Halo',
+        artist: 'Beyoncé',
+        album: 'I Am... Sasha Fierce',
+        duration: 261,
+        path: '/mnt/storage/media/music/Beyonce/Halo [haloYt12345].m4a',
+        year: 2008,
+      },
+      {
+        id: 'song-2',
+        title: 'Midnight City',
+        artist: 'M83',
+        album: "Hurry Up, We're Dreaming",
+        duration: 243,
+        path: '/mnt/storage/media/music/M83/Midnight City.flac',
+        year: 2011,
+      },
+      {
+        id: 'song-3',
+        title: 'Nights',
+        artist: 'Frank Ocean',
+        album: 'Blonde',
+        duration: 307,
+        path: '/mnt/storage/media/music/Frank Ocean/Nights.m4a',
+        year: 2016,
+      },
+      {
+        id: 'song-4',
+        title: 'Starlight',
+        artist: 'Muse',
+        album: 'Black Holes and Revelations',
+        duration: 240,
+        path: '/mnt/storage/media/music/Muse/Starlight.m4a',
+        year: 2006,
+      },
+    ],
+    musicPlaylists: [
+      {
+        id: 'pl-1',
+        name: 'Late Night Drive',
+        comment: 'Chill electronic favorites',
+        public: false,
+        songCount: 2,
+        duration: 550,
+        entry: [
+          {
+            id: 'song-2',
+            title: 'Midnight City',
+            artist: 'M83',
+            album: "Hurry Up, We're Dreaming",
+            duration: 243,
+          },
+          {
+            id: 'song-3',
+            title: 'Nights',
+            artist: 'Frank Ocean',
+            album: 'Blonde',
+            duration: 307,
+          },
+        ],
+      },
+    ],
+    naviloadTracks: [
+      {
+        id: 'trk-review-1',
+        video_id: 'dQw4w9WgXcQ',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        title: 'Never Gonna Give You Up (Official Video)',
+        artist: 'Rick Astley',
+        album: 'Whenever You Need Somebody',
+        status: 'pending_review',
+        suggestions: [
+          {
+            source: 'musicbrainz',
+            title: 'Never Gonna Give You Up',
+            artist: 'Rick Astley',
+            album: 'Whenever You Need Somebody',
+            score: 0.99,
+          },
+          {
+            source: 'acoustid',
+            title: 'Never Gonna Give You Up (7" Mix)',
+            artist: 'Rick Astley',
+            album: 'Singles',
+            score: 0.91,
+          },
+        ],
+      },
+    ],
+    naviloadCandidates: {
+      default: [
+        {
+          video_id: 'ytMissing01',
+          url: 'https://www.youtube.com/watch?v=ytMissing01',
+          title: 'Daydreaming',
+          channel: 'Radiohead - Topic',
+          duration_seconds: 384,
+          view_count: 15_000_000,
+          is_topic_channel: true,
+        },
+        {
+          video_id: 'ytMissing02',
+          url: 'https://www.youtube.com/watch?v=ytMissing02',
+          title: 'Daydreaming (Live Acoustic Cover)',
+          channel: 'Random Covers',
+          duration_seconds: 210,
+          view_count: 1200,
+          is_topic_channel: false,
+        },
+      ],
     },
   };
 }

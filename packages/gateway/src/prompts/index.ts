@@ -52,4 +52,32 @@ Report any findings sorted by severity.`,
         ],
       }),
   });
+
+  registry.registerPrompt({
+    name: 'build_playlist',
+    title: 'Build Playlist',
+    description: 'Find matching songs in Navidrome, search YouTube for missing songs via NaviLoad, and build a playlist',
+    argsSchema: z.object({
+      name: z.string().describe('Playlist name'),
+      theme_or_songs: z.string().describe('Theme or comma/newline-separated artist - title list'),
+    }),
+    handler: (args) => {
+      const name = typeof args['name'] === 'string' ? args['name'] : 'Road Trip';
+      const songs = typeof args['theme_or_songs'] === 'string' ? args['theme_or_songs'] : '';
+      return Promise.resolve({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Build Navidrome playlist "${name}" from: ${songs}
+1. Call music_build_playlist({ name: "${name}", tracks: [...] }).
+2. Present matched tracks and missing YouTube candidates clearly so the user chooses which to download.
+3. Call music_build_playlist_apply with the selected candidates, then check naviload_review_list for staged tracks requiring human metadata review.`,
+            },
+          },
+        ],
+      });
+    },
+  });
 }

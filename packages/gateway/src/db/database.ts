@@ -153,6 +153,82 @@ export class HomemcpDb {
     }));
   }
 
+  public insertMusicJobItem(item: {
+    jobId: string;
+    playlistId?: string | undefined;
+    playlistName: string;
+    videoId: string;
+    naviloadTrackId?: string | undefined;
+    state: string;
+    songId?: string | undefined;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO music_jobs (job_id, playlist_id, playlist_name, video_id, naviload_track_id, state, song_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        item.jobId,
+        item.playlistId ?? null,
+        item.playlistName,
+        item.videoId,
+        item.naviloadTrackId ?? null,
+        item.state,
+        item.songId ?? null,
+        new Date().toISOString(),
+      );
+  }
+
+  public listMusicJobItems(jobId: string): Array<{
+    id: number;
+    job_id: string;
+    playlist_id: string | null;
+    playlist_name: string;
+    video_id: string;
+    naviload_track_id: string | null;
+    state: string;
+    song_id: string | null;
+    updated_at: string;
+  }> {
+    return this.db
+      .prepare('SELECT * FROM music_jobs WHERE job_id = ? ORDER BY id ASC')
+      .all(jobId) as Array<{
+      id: number;
+      job_id: string;
+      playlist_id: string | null;
+      playlist_name: string;
+      video_id: string;
+      naviload_track_id: string | null;
+      state: string;
+      song_id: string | null;
+      updated_at: string;
+    }>;
+  }
+
+  public updateMusicJobItem(
+    id: number,
+    patch: { playlistId?: string | undefined; naviloadTrackId?: string | undefined; state?: string | undefined; songId?: string | undefined },
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE music_jobs
+         SET playlist_id = COALESCE(?, playlist_id),
+             naviload_track_id = COALESCE(?, naviload_track_id),
+             state = COALESCE(?, state),
+             song_id = COALESCE(?, song_id),
+             updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        patch.playlistId ?? null,
+        patch.naviloadTrackId ?? null,
+        patch.state ?? null,
+        patch.songId ?? null,
+        new Date().toISOString(),
+        id,
+      );
+  }
+
   public close(): void {
     this.db.close();
   }

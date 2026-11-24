@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import { parseDurationMs } from '@homemcp/core';
+import { HomemcpError, parseDurationMs } from '@homemcp/core';
 import type { GatewayDeps } from '../server/factory.js';
 
 export function registerCoreModule(deps: GatewayDeps): void {
@@ -207,6 +207,8 @@ export function registerCoreModule(deps: GatewayDeps): void {
             npm: Boolean(deps.npm),
             cloudflare: Boolean(deps.cloudflare),
             vaultwarden: Boolean(deps.vaultwarden),
+            subsonic: Boolean(deps.subsonic),
+            naviload: Boolean(deps.naviload),
           },
           tool_count: registry.listTools().length,
         },
@@ -263,6 +265,139 @@ export function registerCoreModule(deps: GatewayDeps): void {
       return Promise.resolve({
         summary: `Returned ${entries.length} audit entries`,
         structured: { entries },
+      });
+    },
+  });
+
+  registry.registerTool({
+    name: 'jobs_list',
+    toolset: 'core',
+    tier: 'T0',
+    description:
+      'Lists background and async jobs tracked by homemcp (e.g., playlist downloads, backups, updates). Read-only. Example: jobs_list({ status: "running" }).',
+    annotations: {
+      title: 'List Background Jobs',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        status: z
+          .enum(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'waiting_user'])
+          .optional(),
+        kind: z.string().optional(),
+        limit: z.number().int().min(1).max(200).default(50),
+      })
+      .strict(),
+    outputSchema: z.object({
+      jobs: z.array(
+        z.object({
+          id: z.string(),
+          kind: z.string(),
+          status: z.string(),
+          progress: z.number().int(),
+          created_by: z.string(),
+          created_at: z.string(),
+          finished_at: z.string().optional(),
+          error: z.string().optional(),
+        }),
+      ),
+    }),
+    handler: (args) => {
+      const jobs = deps.jobs.listJobs({
+        status: args.status,
+        kind: args.kind,
+        limit: args.limit,
+      });
+      return Promise.resolve({
+        summary: `${jobs.length} jobs found`,
+        structured: {
+          jobs: jobs.map((j) => ({
+            id: j.id,
+            kind: j.kind,
+            status: j.status,
+            progress: j.progress,
+            created_by: j.created_by,
+            created_at: j.created_at,
+            ...(j.finished_at ? { finished_at: j.finished_at } : {}),
+            ...(j.error ? { error: j.error } : {}),
+          })),
+        },
+      });
+    },
+  });
+
+  registry.registerTool({
+    name: 'jobs_get',
+    toolset: 'core',
+    tier: 'T0',
+    description:
+      'Returns detailed step logs, progress percentage, and redacted output for a single background job. Read-only. Example: jobs_get({ job_id: "job_123" }).',
+    annotations: {
+      title: 'Get Background Job',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({ job_id: z.string().min(1) }).strict(),
+    outputSchema: z.object({
+      id: z.string(),
+      kind: z.string(),
+      status: z.string(),
+      progress: z.number().int(),
+      steps: z.array(z.object({ ts: z.string(), message: z.string() })),
+      created_by: z.string(),
+      created_at: z.string(),
+      started_at: z.string().optional(),
+      finished_at: z.string().optional(),
+      result_redacted: z.unknown().optional(),
+      error: z.string().optional(),
+      cancel_requested: z.boolean(),
+    }),
+    handler: (args) => {
+      const job = deps.jobs.getJob(args.job_id);
+      if (!job) {
+        throw new HomemcpError('NOT_FOUND', `Job not found: ${args.job_id}`);
+      }
+      return Promise.resolve({
+        summary: `Job ${job.id} (${job.kind}): ${job.status} (${job.progress}%)`,
+        structured: job,
+      });
+    },
+  });
+
+  registry.registerTool({
+    name: 'jobs_cancel',
+    toolset: 'core',
+    tier: 'T1',
+    description:
+      'Requests cancellation of a queued, running, or waiting background job. Example: jobs_cancel({ job_id: "job_123" }).',
+    annotations: {
+      title: 'Cancel Background Job',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({ job_id: z.string().min(1) }).strict(),
+    outputSchema: z.object({
+      id: z.string(),
+      status: z.string(),
+      cancel_requested: z.boolean(),
+    }),
+    handler: (args) => {
+      const job = deps.jobs.requestCancel(args.job_id);
+      return Promise.resolve({
+        summary: `Job ${job.id}: ${job.status} (cancel requested)`,
+        structured: {
+          id: job.id,
+          status: job.status,
+          cancel_requested: job.cancel_requested,
+        },
+        jobId: job.id,
       });
     },
   });
