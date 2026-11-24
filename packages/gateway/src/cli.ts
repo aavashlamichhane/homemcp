@@ -2,21 +2,30 @@
 import { pathToFileURL } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { loadConfig, Redactor } from '@homemcp/core';
+import { startHttpGateway } from './auth/http-server.js';
+import { OwnerAuthService } from './auth/webauthn.js';
 import { buildMcpServer, createGatewayDeps } from './server/factory.js';
 
 export interface CliArgs {
-  command: 'serve' | 'doctor';
+  command: 'serve' | 'doctor' | 'auth-bootstrap';
   transport: 'stdio' | 'http';
   configPath?: string | undefined;
   mock: boolean;
+  force: boolean;
   toolsets?: string | undefined;
 }
 
 export function parseCliArgs(argv: readonly string[]): CliArgs {
-  const command = argv[0] === 'doctor' ? 'doctor' : 'serve';
+  const command =
+    argv[0] === 'doctor'
+      ? 'doctor'
+      : argv[0] === 'auth' && argv[1] === 'bootstrap'
+        ? 'auth-bootstrap'
+        : 'serve';
   let transport: 'stdio' | 'http' = 'stdio';
   let configPath: string | undefined;
   let mock = false;
+  let force = false;
   let toolsets: string | undefined;
 
   for (let i = 1; i < argv.length; i++) {
@@ -27,11 +36,13 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       configPath = argv[++i];
     } else if (arg === '--mock') {
       mock = true;
+    } else if (arg === '--force') {
+      force = true;
     } else if (arg === '--toolsets' && argv[i + 1]) {
       toolsets = argv[++i];
     }
   }
-  return { command, transport, configPath, mock, toolsets };
+  return { command, transport, configPath, mock, force, toolsets };
 }
 
 async function runDoctor(args: CliArgs): Promise<number> {
@@ -89,18 +100,66 @@ async function runDoctor(args: CliArgs): Promise<number> {
   return checks.every((c) => c.ok) ? 0 : 1;
 }
 
+async function runBootstrap(args: CliArgs): Promise<number> {
+  const redactor = new Redactor();
+  const config = args.configPath ? await loadConfig(args.configPath, process.env, redactor) : undefined;
+  const deps = createGatewayDeps({ config, mock: args.mock || !config, redactor });
+  const rpId = new URL(deps.config.server.publicUrl).hostname;
+  const authService = new OwnerAuthService(deps.db, {
+    rpId,
+    rpName: 'homemcp',
+    origin: deps.config.server.publicUrl,
+    secretKey: deps.config.auth.secretKey,
+    ownerName: deps.config.auth.owner.name,
+  });
+
+  if (authService.isBootstrapped() && !args.force) {
+    process.stderr.write(
+      'Owner already bootstrapped. Re-run with --force only if adding/recovering credentials.\n',
+    );
+    deps.db.close();
+    return 1;
+  }
+
+  const { rawToken, expiresAt } = deps.pats.issueBootstrapToken();
+  const base = deps.config.server.publicUrl.replace(/\/+$/, '');
+  process.stdout.write(
+    `One-time bootstrap URL (expires ${expiresAt}):\n${base}/account/bootstrap?token=${rawToken}\n`,
+  );
+  deps.db.close();
+  return 0;
+}
+
 async function main(): Promise<void> {
   const args = parseCliArgs(process.argv.slice(2));
   if (args.command === 'doctor') {
-    const code = await runDoctor(args);
-    process.exit(code);
+    process.exit(await runDoctor(args));
+  }
+  if (args.command === 'auth-bootstrap') {
+    process.exit(await runBootstrap(args));
   }
 
   const redactor = new Redactor();
   const config = args.configPath ? await loadConfig(args.configPath, process.env, redactor) : undefined;
   const deps = createGatewayDeps({ config, mock: args.mock || !config, redactor });
-  const server = buildMcpServer(deps, { toolsetFilter: args.toolsets });
 
+  if (args.transport === 'http') {
+    const httpHandle = await startHttpGateway(deps);
+    process.stderr.write(
+      `homemcp HTTP gateway listening on ${httpHandle.baseUrl} (${deps.isMock ? 'mock' : 'live'})\n`,
+    );
+    const shutdown = (): void => {
+      void httpHandle.close().finally(() => {
+        deps.db.close();
+        process.exit(0);
+      });
+    };
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+    return;
+  }
+
+  const server = buildMcpServer(deps, { toolsetFilter: args.toolsets });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stderr.write(`homemcp stdio server ready (${deps.isMock ? 'mock' : 'live'})\n`);

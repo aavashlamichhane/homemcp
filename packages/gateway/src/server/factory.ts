@@ -35,7 +35,9 @@ import {
   MockVaultwardenConnector,
 } from '@homemcp/mock';
 import { HomemcpDb } from '../db/database.js';
+import { PatManager } from '../auth/pats.js';
 import { registerAppsModule } from '../modules/apps.js';
+import { registerAuthModule } from '../modules/auth.js';
 import { registerBackupModule } from '../modules/backup.js';
 import { registerCoreModule } from '../modules/core.js';
 import { registerDockerModule } from '../modules/docker.js';
@@ -51,6 +53,7 @@ export interface GatewayDeps {
   db: HomemcpDb;
   redactor: Redactor;
   registry: HomemcpRegistry;
+  pats: PatManager;
   agent: AgentExecutor;
   docker?: DockerConnector | undefined;
   ociRegistry: RegistryConnector;
@@ -166,6 +169,7 @@ export function createGatewayDeps(opts: {
 
   const db = new HomemcpDb(opts.dbPath ?? (isMock ? ':memory:' : '/data/homemcp.db'));
   const registry = new HomemcpRegistry();
+  const pats = new PatManager(db);
 
   let agent: AgentExecutor;
   let docker: DockerConnector | undefined;
@@ -211,6 +215,7 @@ export function createGatewayDeps(opts: {
     db,
     redactor,
     registry,
+    pats,
     agent,
     docker,
     ociRegistry,
@@ -229,6 +234,7 @@ export function createGatewayDeps(opts: {
   registerAppsModule(deps);
   registerBackupModule(deps);
   registerVaultwardenModule(deps);
+  registerAuthModule(deps, { patManager: pats, publicUrl: config.server.publicUrl });
   registerResources(deps);
   registerPrompts(deps);
 

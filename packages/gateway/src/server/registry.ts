@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { McpServer, ServerContext } from '@modelcontextprotocol/server';
-import { requireScopes, ResourceTemplate } from '@modelcontextprotocol/server';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type * as z from 'zod/v4';
 import {
   buildToolResult,
@@ -125,11 +125,41 @@ export class HomemcpRegistry {
     },
   ): void {
     const activeSet = new Set(deps.activeToolsets);
+    const toolScopes = new Map<string, Scope>();
+    const makeScopeChallenge =
+      (required: Scope) =>
+      ({
+        authInfo,
+      }: {
+        authInfo?: { scopes: string[] } | undefined;
+      }): { scopes: readonly [string, ...string[]] } | undefined => {
+        if (!authInfo) return undefined;
+        if (hasRequiredScope(authInfo.scopes, required)) return undefined;
+        return { scopes: [required] };
+      };
+
+    const resolveAuth = (mcpCtx: ServerContext): AuthContext => {
+      const httpAuth = mcpCtx.http?.authInfo;
+      if (!httpAuth) return deps.defaultAuth;
+      const extraSub = httpAuth.extra?.['subject'];
+      const extraTid = httpAuth.extra?.['tokenId'];
+      return {
+        subject: typeof extraSub === 'string' ? extraSub : 'owner',
+        clientId: httpAuth.clientId,
+        tokenKind: (httpAuth.extra?.['tokenKind'] as AuthContext['tokenKind']) ?? 'oauth',
+        tokenId: typeof extraTid === 'string' ? extraTid : 'unknown',
+        scopes: httpAuth.scopes,
+        authTime:
+          typeof httpAuth.extra?.['authTime'] === 'number'
+            ? httpAuth.extra['authTime']
+            : undefined,
+      };
+    };
 
     for (const tool of this.tools.values()) {
       if (!activeSet.has(tool.toolset)) continue;
       const reqScope = requiredScopeForTool(tool.tier, tool.scope);
-      if (!hasRequiredScope(deps.defaultAuth.scopes, reqScope)) continue;
+      toolScopes.set(tool.name, reqScope);
 
       const config = {
         title: tool.annotations.title,
@@ -137,27 +167,12 @@ export class HomemcpRegistry {
         annotations: tool.annotations,
         ...(tool.inputSchema ? { inputSchema: tool.inputSchema } : {}),
         outputSchema: tool.outputSchema,
-        scopeChallenge: requireScopes(reqScope),
+        scopeChallenge: makeScopeChallenge(reqScope),
       };
 
       const execute = async (args: unknown, mcpCtx: ServerContext) => {
         const start = Date.now();
-        const extraSub = mcpCtx.http?.authInfo?.extra?.['subject'];
-        const extraTid = mcpCtx.http?.authInfo?.extra?.['tokenId'];
-        const auth: AuthContext = mcpCtx.http?.authInfo
-          ? {
-              subject: typeof extraSub === 'string' ? extraSub : 'owner',
-              clientId: mcpCtx.http.authInfo.clientId,
-              tokenKind:
-                (mcpCtx.http.authInfo.extra?.['tokenKind'] as AuthContext['tokenKind']) ?? 'oauth',
-              tokenId: typeof extraTid === 'string' ? extraTid : 'unknown',
-              scopes: mcpCtx.http.authInfo.scopes,
-              authTime:
-                typeof mcpCtx.http.authInfo.extra?.['authTime'] === 'number'
-                  ? mcpCtx.http.authInfo.extra['authTime']
-                  : undefined,
-            }
-          : deps.defaultAuth;
+        const auth = resolveAuth(mcpCtx);
 
         const redactedArgs = deps.redactor.redactValue(args ?? {}).value;
         let status = 'ok';
@@ -241,9 +256,33 @@ export class HomemcpRegistry {
       );
     }
 
+    if (toolScopes.size > 0) {
+      type ListToolsHandler = (
+        request: unknown,
+        ctx: ServerContext,
+      ) => Promise<{ tools: Array<{ name: string }> }>;
+      const handlers = (
+        server.server as unknown as {
+          _requestHandlers?: Map<string, ListToolsHandler>;
+        }
+      )._requestHandlers;
+      const baseListHandler = handlers?.get('tools/list');
+      if (handlers && baseListHandler) {
+        handlers.set('tools/list', async (request, ctx) => {
+          const result = await baseListHandler(request, ctx);
+          const scopes = ctx.http?.authInfo?.scopes ?? deps.defaultAuth.scopes;
+          return {
+            ...result,
+            tools: result.tools.filter((t) =>
+              hasRequiredScope(scopes, toolScopes.get(t.name) ?? 'homemcp:read'),
+            ),
+          };
+        });
+      }
+    }
+
     for (const res of this.resources) {
       const reqScope = res.scope ?? 'homemcp:read';
-      if (!hasRequiredScope(deps.defaultAuth.scopes, reqScope)) continue;
 
       if (res.template) {
         const tmpl = new ResourceTemplate(res.template, {
@@ -261,15 +300,15 @@ export class HomemcpRegistry {
             title: res.title,
             description: res.description,
             mimeType: res.mimeType,
-            scopeChallenge: requireScopes(reqScope),
+            scopeChallenge: makeScopeChallenge(reqScope),
           },
           async (uri, vars, mcpCtx) => {
+            const auth = resolveAuth(mcpCtx);
             const strVars: Record<string, string> = {};
             for (const [k, v] of Object.entries(vars)) {
               strVars[k] = Array.isArray(v) ? v.join('/') : String(v);
             }
-            const text = await res.handler(uri, strVars, deps.defaultAuth);
-            void mcpCtx;
+            const text = await res.handler(uri, strVars, auth);
             const redacted = deps.redactor.redactString(text).text;
             return { contents: [{ uri: uri.href, mimeType: res.mimeType, text: redacted }] };
           },
@@ -282,10 +321,11 @@ export class HomemcpRegistry {
             title: res.title,
             description: res.description,
             mimeType: res.mimeType,
-            scopeChallenge: requireScopes(reqScope),
+            scopeChallenge: makeScopeChallenge(reqScope),
           },
-          async (uri) => {
-            const text = await res.handler(uri, {}, deps.defaultAuth);
+          async (uri, mcpCtx) => {
+            const auth = resolveAuth(mcpCtx);
+            const text = await res.handler(uri, {}, auth);
             const redacted = deps.redactor.redactString(text).text;
             return { contents: [{ uri: uri.href, mimeType: res.mimeType, text: redacted }] };
           },
