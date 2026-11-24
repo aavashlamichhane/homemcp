@@ -28,7 +28,7 @@ flowchart LR
 
 ## Capabilities Overview
 
-**133 tools across 15 toolsets**, **9 MCP resources**, and **8 workflow prompts** ([full generated reference](docs/tools.md) · [detailed feature catalog](docs/features.md)):
+**134 tools across 15 toolsets**, **9 MCP resources**, and **8 workflow prompts** ([full generated reference](docs/tools.md) · [detailed feature catalog](docs/features.md)):
 
 | Toolset       | Tools | Tiers      | Summary                                                                                                                                                        |
 | ------------- | ----- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -43,7 +43,7 @@ flowchart LR
 | `music`       | 14    | T0, T1, T2 | Navidrome/Subsonic library search, stats, rescan, fuzzy track matcher, playlist CRUD                                                                           |
 | `naviload`    | 10    | T0, T1     | Search and download tracks/albums/batches via NaviLoad and sync Navidrome                                                                                      |
 | `media`       | 12    | T0, T1, T2 | Jellyfin libraries, sessions, search, scans, scheduled tasks, activity logs                                                                                    |
-| `downloads`   | 4     | T0, T1, T2 | qBittorrent status, categories, magnet/URL enqueue, pause/resume/throttle                                                                                      |
+| `downloads`   | 5     | T0, T1, T2 | qBittorrent search/sort/inspect, categories, magnet/URL enqueue, pause/resume/recheck, plan-first removal                                                      |
 | `alerts`      | 6     | T0, T1, T2 | Built-in metric/health rule watcher, ack/snooze, threshold tuning, `ntfy` + offline SQLite queue                                                               |
 | `files`       | 10    | T0, T1, T2 | Root-allowlisted file browse/read/write/move, `.env`/key denylist, soft-delete `.trash` (no `rm -rf`)                                                          |
 | `auth`        | 6     | T0, T2, T3 | OAuth client listing/revocation and **passkey-revealed Personal Access Tokens (PATs)**                                                                         |

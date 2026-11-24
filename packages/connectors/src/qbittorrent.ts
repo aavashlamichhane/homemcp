@@ -1,5 +1,5 @@
 import { HomemcpError } from '@homemcp/core';
-import { fetchJson, fetchWithTimeout } from './http.js';
+import { fetchWithTimeout } from './http.js';
 
 export interface QbitTransferInfo {
   dl_info_speed: number;
@@ -21,11 +21,35 @@ export interface QbitTorrent {
   ratio: number;
   category: string;
   save_path: string;
+  added_on?: number | undefined;
+  completion_on?: number | undefined;
+  downloaded?: number | undefined;
+  uploaded?: number | undefined;
+  num_seeds?: number | undefined;
+  num_leechs?: number | undefined;
+  amount_left?: number | undefined;
+}
+
+export interface QbitTorrentFile {
+  index: number;
+  name: string;
+  size: number;
+  progress: number;
+  priority: number;
+}
+
+export interface QbitTorrentTracker {
+  url: string;
+  status: number;
+  num_peers: number;
+  msg: string;
 }
 
 export interface QbittorrentConnector {
   getTransferInfo(): Promise<QbitTransferInfo>;
   listTorrents(filter?: string): Promise<QbitTorrent[]>;
+  getTorrentFiles(hash: string): Promise<QbitTorrentFile[]>;
+  getTorrentTrackers(hash: string): Promise<QbitTorrentTracker[]>;
   addTorrent(opts: {
     urls: readonly string[];
     category?: string | undefined;
@@ -97,19 +121,26 @@ export class HttpQbittorrentConnector implements QbittorrentConnector {
   }
 
   public async getTransferInfo(): Promise<QbitTransferInfo> {
-    await this.withAuth('/api/v2/transfer/info');
-    // Re-fetch with fetchJson if needed or parse directly
-    const cookie = this.sidCookie ?? (await this.login());
-    return fetchJson<QbitTransferInfo>(`${this.baseUrl}/api/v2/transfer/info`, {
-      headers: { Cookie: cookie },
-      serviceName: 'qbittorrent',
-    });
+    const resp = await this.withAuth('/api/v2/transfer/info');
+    return (await resp.json()) as QbitTransferInfo;
   }
 
   public async listTorrents(filter?: string): Promise<QbitTorrent[]> {
     const qs = filter ? `?filter=${encodeURIComponent(filter)}` : '';
     const resp = await this.withAuth(`/api/v2/torrents/info${qs}`);
     return (await resp.json()) as QbitTorrent[];
+  }
+
+  public async getTorrentFiles(hash: string): Promise<QbitTorrentFile[]> {
+    const qs = `?hash=${encodeURIComponent(hash)}`;
+    const resp = await this.withAuth(`/api/v2/torrents/files${qs}`);
+    return (await resp.json()) as QbitTorrentFile[];
+  }
+
+  public async getTorrentTrackers(hash: string): Promise<QbitTorrentTracker[]> {
+    const qs = `?hash=${encodeURIComponent(hash)}`;
+    const resp = await this.withAuth(`/api/v2/torrents/trackers${qs}`);
+    return (await resp.json()) as QbitTorrentTracker[];
   }
 
   public async addTorrent(opts: {
@@ -131,17 +162,31 @@ export class HttpQbittorrentConnector implements QbittorrentConnector {
     action: 'pause' | 'resume' | 'recheck',
     hashes: readonly string[],
   ): Promise<void> {
-    const endpoint =
-      action === 'pause'
-        ? '/api/v2/torrents/stop'
-        : action === 'resume'
-          ? '/api/v2/torrents/start'
-          : '/api/v2/torrents/recheck';
-    await this.withAuth(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ hashes: hashes.join('|') }).toString(),
-    });
+    const body = new URLSearchParams({ hashes: hashes.join('|') }).toString();
+    const post = (endpoint: string) =>
+      this.withAuth(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+
+    if (action === 'recheck') {
+      await post('/api/v2/torrents/recheck');
+      return;
+    }
+
+    // qBittorrent 5.0+ uses /stop and /start; 4.6.x and older use /pause and /resume
+    const v5Endpoint = action === 'pause' ? '/api/v2/torrents/stop' : '/api/v2/torrents/start';
+    const v4Endpoint = action === 'pause' ? '/api/v2/torrents/pause' : '/api/v2/torrents/resume';
+    try {
+      await post(v5Endpoint);
+    } catch (err) {
+      if (err instanceof HomemcpError && err.message.includes('HTTP 404')) {
+        await post(v4Endpoint);
+        return;
+      }
+      throw err;
+    }
   }
 
   public async deleteTorrents(hashes: readonly string[], deleteFiles: boolean): Promise<void> {

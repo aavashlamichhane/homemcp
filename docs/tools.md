@@ -2,7 +2,7 @@
 
 > Auto-generated from `HomemcpRegistry` via `pnpm docs:generate`. Do not edit by hand.
 
-**Totals:** 133 tools across 15 toolsets, 9 resources, 8 prompts.
+**Totals:** 134 tools across 15 toolsets, 9 resources, 8 prompts.
 
 ## Toolsets Summary
 
@@ -14,7 +14,7 @@
 | `backup`      | 6     | T0, T1, T3     |
 | `core`        | 6     | T0, T1         |
 | `docker`      | 12    | T0, T2         |
-| `downloads`   | 4     | T0, T1, T2     |
+| `downloads`   | 5     | T0, T1, T2     |
 | `files`       | 10    | T0, T1, T2     |
 | `media`       | 12    | T0, T1, T2     |
 | `music`       | 14    | T0, T1, T2     |
@@ -99,8 +99,9 @@
 | ------------------- | ---- | ----------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `downloads_add`     | T1   | `homemcp:operate` | -/-/-/O         | Adds a magnet link or torrent URL to qBittorrent under a configured category (e.g., movies, series, anime) after verifying target filesystem free space is above safety threshold. |
 | `downloads_control` | T1   | `homemcp:operate` | -/-/I/-         | Pauses, resumes, or forces recheck on one or more torrents by infohash.                                                                                                            |
+| `downloads_inspect` | T0   | `homemcp:read`    | R/-/I/-         | Inspects a specific torrent by infohash or name query, returning completion timestamp, save path, files, and sanitized tracker states. Read-only.                                  |
 | `downloads_remove`  | T2   | `homemcp:admin`   | -/D/-/-         | Removes torrents from qBittorrent (plan-first; deleting downloaded files requires T3 passkey confirmation).                                                                        |
-| `downloads_status`  | T0   | `homemcp:read`    | R/-/I/-         | Shows qBittorrent transfer speeds, connection state, active/stalled torrents, and target storage disk free space. Read-only.                                                       |
+| `downloads_status`  | T0   | `homemcp:read`    | R/-/I/-         | Searches, filters, sorts, and lists qBittorrent torrents along with transfer speeds and configured categories. Read-only.                                                          |
 
 ### `files`
 

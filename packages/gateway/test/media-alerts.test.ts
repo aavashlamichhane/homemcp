@@ -117,6 +117,25 @@ describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
     expect(dlDenied.isError).toBe(true);
     expect((dlDenied.structuredContent['error'] as { code: string }).code).toBe('CONFLICT');
 
+    const dlStatus = await client.callTool('downloads_status', {
+      query: 'Magnet',
+      sort: 'recent',
+      limit: 5,
+    });
+    expect(dlStatus.structuredContent['returned']).toBe(1);
+    expect(
+      ((dlStatus.structuredContent['torrents'] as Array<Record<string, unknown>>)[0] ?? {})['name'],
+    ).toBe('Magnet Download');
+
+    const dlInspect = await client.callTool('downloads_inspect', {
+      hash_or_query: 'Magnet Download',
+    });
+    expect(dlInspect.structuredContent['matched']).toBe(true);
+    expect(dlInspect.structuredContent['total_files']).toBe(1);
+    expect(
+      ((dlInspect.structuredContent['trackers'] as Array<Record<string, unknown>>)[0] ?? {})['url'],
+    ).toBe('https://tracker.example.org/announce');
+
     await ct.close();
     await st.close();
   });

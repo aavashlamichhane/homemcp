@@ -775,6 +775,33 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
     return Promise.resolve([...list]);
   }
 
+  public getTorrentFiles(hash: string) {
+    const found = this.state.qbitTorrents.find((t) => t.hash === hash);
+    if (!found) return Promise.resolve([]);
+    return Promise.resolve([
+      {
+        index: 0,
+        name: `${found.name}/${found.name}.mkv`,
+        size: found.size,
+        progress: found.progress,
+        priority: 1,
+      },
+    ]);
+  }
+
+  public getTorrentTrackers(hash: string) {
+    const found = this.state.qbitTorrents.find((t) => t.hash === hash);
+    if (!found) return Promise.resolve([]);
+    return Promise.resolve([
+      {
+        url: 'https://tracker.example.org/announce',
+        status: 2,
+        num_peers: 12,
+        msg: 'Working',
+      },
+    ]);
+  }
+
   public addTorrent(opts: {
     urls: readonly string[];
     category?: string | undefined;

@@ -97,6 +97,32 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
         res.end(JSON.stringify([]));
         return;
       }
+      if (req.url?.startsWith('/api/v2/torrents/files')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify([{ index: 0, name: 'movie.mkv', size: 1000, progress: 1, priority: 1 }]),
+        );
+        return;
+      }
+      if (req.url?.startsWith('/api/v2/torrents/trackers')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify([
+            {
+              url: 'https://tracker.example.org/announce?passkey=secret',
+              status: 2,
+              num_peers: 5,
+              msg: 'Working',
+            },
+          ]),
+        );
+        return;
+      }
+      if (req.url === '/api/v2/torrents/start') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
       res.writeHead(200);
       res.end('Ok.');
     });
@@ -110,9 +136,16 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
     expect(info.dl_info_speed).toBe(1024);
     await qb.addTorrent({ urls: ['magnet:?xt=urn:btih:0123456789'], category: 'movies' });
     await qb.controlTorrents('pause', ['0123456789']);
+    await qb.controlTorrents('resume', ['0123456789']);
+    const files = await qb.getTorrentFiles('0123456789');
+    const trackers = await qb.getTorrentTrackers('0123456789');
     expect(loginCount).toBe(1);
+    expect(files).toHaveLength(1);
+    expect(trackers).toHaveLength(1);
     expect(seenPaths).toContain('/api/v2/torrents/add');
     expect(seenPaths).toContain('/api/v2/torrents/stop');
+    expect(seenPaths).toContain('/api/v2/torrents/start');
+    expect(seenPaths).toContain('/api/v2/torrents/resume');
   });
 
   it('HttpNtfyConnector and HttpHealthchecksConnector send notifications and pings', async () => {
