@@ -1,0 +1,137 @@
+server:
+  publicUrl: https://homemcp.example.com
+  mcpPath: /mcp
+  listen: 0.0.0.0:8790
+  allowedHosts: [homemcp.example.com]
+  trustProxy: true
+  toolsets:
+    [
+      core,
+      system,
+      docker,
+      network,
+      apps,
+      backup,
+      vaultwarden,
+      music,
+      naviload,
+      media,
+      downloads,
+      alerts,
+      stacks,
+      files,
+      auth,
+    ]
+
+auth:
+  mode: builtin
+  issuer: https://homemcp.example.com
+  owner:
+    name: Owner
+  accessTokenTtl: 15m
+  refreshTokenTtl: 30d
+  clientRegistration:
+    cimd: true
+    dcr: true
+  stepUpMaxAge: 5m
+  secretKey: env:HOMEMCP_SECRET_KEY
+
+agent:
+  socket: /run/homemcpd/homemcpd.sock
+  hmacSecret: env:HOMEMCPD_HMAC_SECRET
+
+policy:
+  protectedContainers:
+    - cloudflared-*
+    - nginx-pm-app-1
+    - homemcp
+    - homemcp-socket-proxy
+    - vaultwarden
+  protectedUnits:
+    - ssh.service
+    - tailscaled.service
+    - homemcpd.service
+  allowedUnits:
+    - qbittorrent-nox@homelab.service
+    - jackett.service
+    - smbd.service
+    - nmbd.service
+    - tailscaled.service
+  roots:
+    stacks: /home/homelab/docker-containers
+    extraStackRoots:
+      - /home/homelab/projects
+    media: /mnt/storage/media
+    shares:
+      - /mnt/storage/samba/shared
+      - /mnt/storage/filebrowser
+  compose:
+    allow:
+      jellyfin:
+        network_mode_host: true
+        devices: [/dev/dri]
+      portainer:
+        docker_sock: true
+    defaultLimits:
+      mem_limit: 512m
+      pids_limit: 256
+
+modules:
+  docker:
+    socketProxy: http://homemcp-socket-proxy:2375
+  network:
+    npm:
+      url: http://192.0.2.10:81
+      email: env:NPM_EMAIL
+      password: env:NPM_PASSWORD
+    cloudflare:
+      accountId: env:CF_ACCOUNT_ID
+      tunnelId: env:CF_TUNNEL_ID
+      apiToken: env:CF_API_TOKEN
+      zones: [example.com]
+      originService: http://192.0.2.10
+  apps:
+    checks:
+      - { name: filebrowser, url: http://192.0.2.10:8081/health }
+      - { name: naviload, url: http://192.0.2.10:8085/healthz }
+  backup:
+    statusDir: /var/lib/homemcp/backup
+    budgetBytes: 7000000000
+    sets:
+      vaultwarden: { rpo: 24h }
+      navidrome: { rpo: 48h }
+      npm: { rpo: 48h }
+      configs: { rpo: 48h }
+      system: { rpo: 48h }
+      jellyfin: { rpo: 8d }
+      userdata: { rpo: 8d }
+  vaultwarden:
+    url: http://192.0.2.10:8082
+    container: vaultwarden
+    publicUrl: https://vw.example.com
+  navidrome:
+    url: http://192.0.2.10:4533
+    user: env:NAVIDROME_USER
+    password: env:NAVIDROME_PASSWORD
+  naviload:
+    url: http://192.0.2.10:8085
+    token: env:NAVILOAD_TOKEN
+  jellyfin:
+    url: http://192.0.2.10:8096
+    apiKey: env:JELLYFIN_API_KEY
+  qbittorrent:
+    url: http://192.0.2.10:8080
+    user: env:QBIT_USER
+    password: env:QBIT_PASSWORD
+    categories:
+      movies: /mnt/storage/media/jellyfin/movies
+      series: /mnt/storage/media/jellyfin/series
+      anime: /mnt/storage/media/jellyfin/anime
+  alerts:
+    ntfy:
+      url: env:NTFY_URL
+      token: env:NTFY_TOKEN
+    healthchecks:
+      pingUrl: env:HC_URL_HOMEMCP
+    digestCron: '0 8 * * *'
+    timezone: UTC

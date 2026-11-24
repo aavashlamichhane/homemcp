@@ -1,0 +1,19 @@
+title = "homemcp gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "cloudflare-tunnel-token"
+description = "Cloudflare Tunnel Token (base64 JSON)"
+regex = '''eyJhIjoi[A-Za-z0-9_-]{20,}'''
+
+[[rules]]
+id = "homemcp-pat"
+description = "homemcp Personal Access Token"
+regex = '''hmp_[A-Za-z0-9_-]{20,}'''
+
+[[rules]]
+id = "ntfy-token"
+description = "ntfy access token"
+regex = '''tk_[a-z0-9]{20,}'''
