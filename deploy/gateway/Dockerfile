@@ -16,6 +16,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN groupadd -g 1000 homemcp || true && useradd -u 1000 -g 1000 -m homemcp || true
 COPY --from=builder --chown=1000:1000 /prod/gateway /app
+COPY --chown=1000:1000 templates/ /app/templates/
+COPY --chown=1000:1000 docs/runbooks/ /app/docs/runbooks/
 USER 1000:1000
 EXPOSE 8790
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
