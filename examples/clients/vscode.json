@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "homemcp": {
+      "type": "http",
+      "url": "https://homemcp.example.com/mcp"
+    },
+    "homemcp-ops": {
+      "type": "http",
+      "url": "https://homemcp.example.com/mcp/system,docker,network,alerts"
+    }
+  }
+}

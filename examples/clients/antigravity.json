@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "homemcp": {
+      "serverUrl": "https://homemcp.example.com/mcp"
+    },
+    "homemcp-music": {
+      "serverUrl": "https://homemcp.example.com/mcp/music,naviload"
+    }
+  }
+}

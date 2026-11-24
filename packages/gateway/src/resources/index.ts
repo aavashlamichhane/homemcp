@@ -1,5 +1,19 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { HomemcpError } from '@homemcp/core';
 import type { GatewayDeps } from '../server/factory.js';
+
+function resolveRunbooksDir(): string {
+  const candidates = [
+    path.resolve(import.meta.dirname, '../../../../docs/runbooks'),
+    path.resolve(import.meta.dirname, '../../../docs/runbooks'),
+    path.resolve(process.cwd(), 'docs/runbooks'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return candidates[0]!;
+}
 
 export function registerResources(deps: GatewayDeps): void {
   const { registry } = deps;
@@ -113,5 +127,33 @@ export function registerResources(deps: GatewayDeps): void {
     description: 'Currently pending and firing alerts evaluated by homemcp watcher',
     mimeType: 'application/json',
     handler: () => Promise.resolve(JSON.stringify(deps.watcher.listAlerts({ includeResolved: false }), null, 2)),
+  });
+
+  registry.registerResource({
+    name: 'docs-runbooks',
+    template: 'homemcp://docs/runbooks/{topic}',
+    title: 'Operational Runbooks',
+    description: 'Emergency & operational Markdown runbooks (restore-vaultwarden, rotate-tunnel-token, add-service, disk-full, break-glass)',
+    mimeType: 'text/markdown',
+    list: () => {
+      const dir = resolveRunbooksDir();
+      const files = existsSync(dir)
+        ? readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => f.replace(/\.md$/, ''))
+        : [];
+      return Promise.resolve({
+        resources: files.map((topic) => ({
+          uri: `homemcp://docs/runbooks/${topic}`,
+          name: `Runbook: ${topic}`,
+        })),
+      });
+    },
+    handler: (_uri, vars) => {
+      const topic = (vars['topic'] ?? '').replace(/[^a-z0-9-]/gi, '');
+      const file = path.join(resolveRunbooksDir(), `${topic}.md`);
+      if (!topic || !existsSync(file)) {
+        throw new HomemcpError('NOT_FOUND', `Runbook not found: ${topic}`);
+      }
+      return Promise.resolve(readFileSync(file, 'utf8'));
+    },
   });
 }
