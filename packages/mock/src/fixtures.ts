@@ -65,6 +65,8 @@ export interface MockState {
   ntfyOnline: boolean;
   ntfySent: NtfyMessage[];
   healthchecksPings: Array<'ok' | 'start' | 'fail'>;
+  simulateUpdateHealthFailure: boolean;
+  failNextCfDns: boolean;
 }
 
 export function createMockState(): MockState {
@@ -632,5 +634,7 @@ export function createMockState(): MockState {
     ntfyOnline: true,
     ntfySent: [],
     healthchecksPings: [],
+    simulateUpdateHealthFailure: false,
+    failNextCfDns: false,
   };
 }

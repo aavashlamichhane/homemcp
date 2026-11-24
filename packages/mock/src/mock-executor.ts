@@ -25,6 +25,11 @@ export class MockExecutor implements AgentExecutor {
         'backup.run',
         'backup.verify',
         'backup.restore_test',
+        'docker.container_action',
+        'docker.compose_update',
+        'docker.prune',
+        'system.service_action',
+        'system.reboot',
       ],
     });
   }
@@ -292,6 +297,63 @@ export class MockExecutor implements AgentExecutor {
         const stackName = typeof params['name'] === 'string' ? params['name'] : 'custom';
         return validateComposePolicy(yaml, { stackName });
       }
+
+      case 'docker.container_action': {
+        const name = typeof params['name'] === 'string' ? params['name'] : '';
+        const action = typeof params['action'] === 'string' ? params['action'] : 'restart';
+        const override = params['override_protected'] === true;
+        if (['vaultwarden', 'nginx-pm-app-1', 'homemcp'].includes(name) && !override) {
+          throw new HomemcpError('POLICY_DENIED', `Protected container "${name}" requires T3 override`);
+        }
+        const c = this.state.containers.find((x) => x.Names.some((n) => n.replace(/^\//, '') === name));
+        if (!c) throw new HomemcpError('NOT_FOUND', `Container not found: ${name}`);
+        c.State = action === 'stop' ? 'exited' : 'running';
+        c.Status = action === 'stop' ? 'Exited (0)' : 'Up 1 second (healthy)';
+        return { name, action, ok: true };
+      }
+
+      case 'docker.compose_update': {
+        const service = typeof params['service'] === 'string' ? params['service'] : '';
+        const targetImage = typeof params['target_image'] === 'string' ? params['target_image'] : undefined;
+        const c = this.state.containers.find((x) => x.Names.some((n) => n.replace(/^\//, '') === service));
+        const prevDigest = c?.ImageID ?? 'sha256:000000';
+        if (this.state.simulateUpdateHealthFailure) {
+          return {
+            service,
+            previous_digests: { [c?.Id ?? 'c1']: prevDigest },
+            updated: false,
+            rolled_back: true,
+            reason: 'Health gate failed (simulated unhealthy after update); restored previous digest',
+          };
+        }
+        if (c && targetImage) c.Image = targetImage;
+        return {
+          service,
+          previous_digests: { [c?.Id ?? 'c1']: prevDigest },
+          updated: true,
+          rolled_back: false,
+        };
+      }
+
+      case 'docker.prune': {
+        const apply = params['apply'] === true;
+        return {
+          applied: apply,
+          reclaimed_summary: apply ? 'Pruned 2 stopped containers, 1 dangling image (420 MB)' : 'Dry run: 2 stopped containers, 1 dangling image',
+        };
+      }
+
+      case 'system.service_action': {
+        const unit = typeof params['unit'] === 'string' ? params['unit'] : '';
+        const action = typeof params['action'] === 'string' ? params['action'] : 'restart';
+        if (['ssh.service', 'tailscaled.service', 'homemcpd.service'].includes(unit)) {
+          throw new HomemcpError('POLICY_DENIED', `Protected unit "${unit}" cannot be altered`);
+        }
+        return { unit, action, ok: true };
+      }
+
+      case 'system.reboot':
+        return { scheduled: true, message: 'Reboot scheduled (+1m, simulated)' };
 
       default:
         throw new HomemcpError('NOT_FOUND', `Unknown mock agent verb: ${verb}`);

@@ -30,10 +30,27 @@ export interface NpmAccessList {
   name: string;
 }
 
+export interface CreateNpmProxyHostInput {
+  domain_names: string[];
+  forward_scheme?: 'http' | 'https' | undefined;
+  forward_host: string;
+  forward_port: number;
+  certificate_id?: number | undefined;
+  access_list_id?: number | undefined;
+  ssl_forced?: boolean | undefined;
+  block_exploits?: boolean | undefined;
+  allow_websocket_upgrade?: boolean | undefined;
+  caching_enabled?: boolean | undefined;
+  enabled?: boolean | undefined;
+}
+
 export interface NpmConnector {
   listProxyHosts(): Promise<NpmProxyHost[]>;
   listCertificates(): Promise<NpmCertificate[]>;
   listAccessLists(): Promise<NpmAccessList[]>;
+  createProxyHost(input: CreateNpmProxyHostInput): Promise<NpmProxyHost>;
+  updateProxyHost(id: number, input: Partial<CreateNpmProxyHostInput>): Promise<NpmProxyHost>;
+  deleteProxyHost(id: number): Promise<void>;
 }
 
 export class HttpNpmConnector implements NpmConnector {
@@ -90,6 +107,63 @@ export class HttpNpmConnector implements NpmConnector {
   public async listAccessLists(): Promise<NpmAccessList[]> {
     const token = await this.getToken();
     return fetchJson<NpmAccessList[]>(`${this.baseUrl}/api/nginx/access-lists`, {
+      headers: { Authorization: `Bearer ${token}` },
+      serviceName: 'npm',
+    });
+  }
+
+  public async createProxyHost(input: CreateNpmProxyHostInput): Promise<NpmProxyHost> {
+    const token = await this.getToken();
+    let certId = input.certificate_id;
+    if (certId === undefined && input.domain_names[0]) {
+      const certs = await this.listCertificates();
+      const domain = input.domain_names[0];
+      const match = certs.find((c) =>
+        c.domain_names.some((pat) =>
+          pat.startsWith('*.') ? domain.endsWith(pat.slice(1)) : domain === pat,
+        ),
+      );
+      certId = match?.id ?? 0;
+    }
+    return fetchJson<NpmProxyHost>(`${this.baseUrl}/api/nginx/proxy-hosts`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        domain_names: input.domain_names,
+        forward_scheme: input.forward_scheme ?? 'http',
+        forward_host: input.forward_host,
+        forward_port: input.forward_port,
+        certificate_id: certId ?? 0,
+        access_list_id: input.access_list_id ?? 0,
+        ssl_forced: input.ssl_forced ?? true,
+        block_exploits: input.block_exploits ?? true,
+        allow_websocket_upgrade: input.allow_websocket_upgrade ?? true,
+        caching_enabled: input.caching_enabled ?? false,
+        enabled: input.enabled ?? true,
+        http2_support: true,
+        meta: { letsencrypt_agree: false, dns_challenge: false },
+      }),
+      serviceName: 'npm',
+    });
+  }
+
+  public async updateProxyHost(
+    id: number,
+    input: Partial<CreateNpmProxyHostInput>,
+  ): Promise<NpmProxyHost> {
+    const token = await this.getToken();
+    return fetchJson<NpmProxyHost>(`${this.baseUrl}/api/nginx/proxy-hosts/${id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      serviceName: 'npm',
+    });
+  }
+
+  public async deleteProxyHost(id: number): Promise<void> {
+    const token = await this.getToken();
+    await fetchWithTimeout(`${this.baseUrl}/api/nginx/proxy-hosts/${id}`, {
+      method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
       serviceName: 'npm',
     });

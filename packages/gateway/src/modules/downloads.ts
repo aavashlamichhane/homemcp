@@ -157,4 +157,92 @@ export function registerDownloadsModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'downloads_remove',
+    toolset: 'downloads',
+    tier: 'T2',
+    description:
+      'Removes torrents from qBittorrent (plan-first; deleting downloaded files requires T3 passkey confirmation).',
+    annotations: {
+      title: 'Remove Downloads',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        hashes: z.array(z.string().min(8)).min(1).max(25),
+        delete_files: z.boolean().default(false),
+        plan_id: z.string().optional(),
+      })
+      .strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      const qb = requireQbit(deps);
+      const tier = args.delete_files ? 'T3' : 'T2';
+      if (!args.plan_id) {
+        const plan = deps.plans.createPlan({
+          tool: 'downloads_remove',
+          tier,
+          payload: { hashes: args.hashes, delete_files: args.delete_files },
+          summary: `Remove ${args.hashes.length} torrent(s) (${args.delete_files ? 'WITH FILES DELETED' : 'keep files on disk'})`,
+          diff: `delete_torrents(${args.hashes.join(', ')}, delete_files=${args.delete_files})`,
+          sideEffects: [
+            args.delete_files
+              ? 'Permanently deletes torrent payload files from disk'
+              : 'Removes torrent entries from qBittorrent (files kept)',
+          ],
+          rollback: [args.delete_files ? 'Irreversible disk deletion' : 'Re-add .torrent/magnet'],
+          createdBy: ctx.auth.subject,
+        });
+        const chal = deps.confirmations.createChallenge(plan.id, 'url');
+        const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+        return {
+          summary: `Plan ${plan.id} created`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: plan.id,
+            confirmation_id: chal.id,
+            confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          },
+          planId: plan.id,
+          confirmationId: chal.id,
+        };
+      }
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'downloads_remove',
+        tier: args.delete_files ? 'T3' : 'T2',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const p = gate.plan.payload as { hashes: string[]; delete_files: boolean };
+      await qb.deleteTorrents(p.hashes, Boolean(p.delete_files));
+      deps.plans.markApplied(gate.plan.id);
+      return {
+        summary: `Removed ${p.hashes.length} torrent(s)`,
+        structured: { applied: true, status: 'applied', removed: p.hashes.length },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
+      };
+    },
+  });
 }

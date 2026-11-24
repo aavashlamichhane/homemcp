@@ -415,4 +415,170 @@ export function registerSystemModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'system_service_action',
+    toolset: 'system',
+    tier: 'T2',
+    description:
+      'Starts, stops, or restarts an allowlisted host systemd unit (protected units always denied). Plan-first when plan_id is omitted.',
+    annotations: {
+      title: 'Systemd Service Action',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        unit: z.string().min(1),
+        action: z.enum(['start', 'stop', 'restart']),
+        plan_id: z.string().optional(),
+      })
+      .strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      if (!args.plan_id) {
+        const plan = deps.plans.createPlan({
+          tool: 'system_service_action',
+          tier: 'T2',
+          payload: { unit: args.unit, action: args.action },
+          summary: `${args.action} systemd unit ${args.unit}`,
+          diff: `systemctl ${args.action} ${args.unit}`,
+          sideEffects: [`Systemd unit ${args.unit} will ${args.action}`],
+          rollback: [`systemctl ${args.action === 'stop' ? 'start' : 'restart'} ${args.unit}`],
+          createdBy: ctx.auth.subject,
+        });
+        const chal = deps.confirmations.createChallenge(plan.id, 'url');
+        const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+        return {
+          summary: `Plan ${plan.id} created; confirm at ${publicUrl}/confirm/${chal.id}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: plan.id,
+            confirmation_id: chal.id,
+            confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          },
+          planId: plan.id,
+          confirmationId: chal.id,
+        };
+      }
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'system_service_action',
+        tier: 'T2',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const p = gate.plan.payload as { unit: string; action: string };
+      const res = await deps.agent.call<{ unit: string; action: string; ok: boolean }>(
+        'system.service_action',
+        p,
+      );
+      deps.plans.markApplied(gate.plan.id);
+      return {
+        summary: `Executed systemctl ${res.action} ${res.unit}`,
+        structured: { applied: true, status: 'applied', ...res },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
+      };
+    },
+  });
+
+  registry.registerTool({
+    name: 'system_reboot',
+    toolset: 'system',
+    tier: 'T3',
+    description:
+      'Schedules a host reboot in 1 minute with an ntfy alert. Requires T3 passkey confirmation via /confirm/:id.',
+    annotations: {
+      title: 'Reboot Host',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({ plan_id: z.string().optional(), reason: z.string().default('kernel updates') }).strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      if (!args.plan_id) {
+        const plan = deps.plans.createPlan({
+          tool: 'system_reboot',
+          tier: 'T3',
+          payload: { reason: args.reason },
+          summary: `Reboot homelab host in 1 minute (reason: ${args.reason})`,
+          diff: 'shutdown -r +1',
+          sideEffects: ['All containers and SSH sessions will disconnect for ~2-3 minutes'],
+          rollback: ['Host comes back automatically via systemd'],
+          createdBy: ctx.auth.subject,
+        });
+        const chal = deps.confirmations.createChallenge(plan.id, 'url');
+        const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+        return {
+          summary: `Reboot plan ${plan.id} requires passkey confirmation at ${publicUrl}/confirm/${chal.id}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: plan.id,
+            confirmation_id: chal.id,
+            confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          },
+          planId: plan.id,
+          confirmationId: chal.id,
+        };
+      }
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'system_reboot',
+        tier: 'T3',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Passkey confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const res = await deps.agent.call<{ scheduled: boolean; message: string }>('system.reboot', {});
+      deps.plans.markApplied(gate.plan.id);
+      await deps.watcher.sendOrQueueNotification({
+        title: 'Host Reboot Scheduled',
+        message: `Reboot triggered by ${ctx.auth.subject}: ${args.reason}`,
+        priority: 4,
+        tags: ['warning', 'arrows_counterclockwise'],
+      });
+      return {
+        summary: res.message,
+        structured: { applied: true, status: 'applied', ...res },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
+      };
+    },
+  });
 }

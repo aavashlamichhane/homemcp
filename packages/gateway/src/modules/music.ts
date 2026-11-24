@@ -746,4 +746,81 @@ export function registerMusicModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'music_playlist_delete',
+    toolset: 'music',
+    tier: 'T2',
+    description: 'Deletes a Navidrome playlist (plan-first + confirmation required).',
+    annotations: {
+      title: 'Delete Music Playlist',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({ playlist_id: z.string().min(1), plan_id: z.string().optional() }).strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      const sub = requireSubsonic(deps);
+      if (!args.plan_id) {
+        const pl = await sub.getPlaylist(args.playlist_id);
+        const plan = deps.plans.createPlan({
+          tool: 'music_playlist_delete',
+          tier: 'T2',
+          payload: { playlist_id: pl.id, name: pl.name },
+          summary: `Delete Navidrome playlist "${pl.name}" (${pl.songCount} songs)`,
+          diff: `- playlist "${pl.name}" (${pl.id})`,
+          sideEffects: ['Playlist definition deleted from Navidrome (audio files untouched)'],
+          rollback: ['Recreate playlist with music_playlist_create'],
+          createdBy: ctx.auth.subject,
+        });
+        const chal = deps.confirmations.createChallenge(plan.id, 'url');
+        const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+        return {
+          summary: `Plan ${plan.id} created for deleting playlist "${pl.name}"`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: plan.id,
+            confirmation_id: chal.id,
+            confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          },
+          planId: plan.id,
+          confirmationId: chal.id,
+        };
+      }
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'music_playlist_delete',
+        tier: 'T2',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const p = gate.plan.payload as { playlist_id: string };
+      await sub.deletePlaylist(p.playlist_id);
+      deps.plans.markApplied(gate.plan.id);
+      return {
+        summary: `Deleted playlist ${p.playlist_id}`,
+        structured: { applied: true, status: 'applied', deleted_playlist_id: p.playlist_id },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
+      };
+    },
+  });
 }

@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import { parseDurationMs } from '@homemcp/core';
+import { HomemcpError, parseDurationMs } from '@homemcp/core';
 import type { GatewayDeps } from '../server/factory.js';
 
 export function registerBackupModule(deps: GatewayDeps): void {
@@ -262,6 +262,100 @@ export function registerBackupModule(deps: GatewayDeps): void {
           output,
         },
         jobId: job.id,
+      };
+    },
+  });
+
+  registry.registerTool({
+    name: 'backup_restore',
+    toolset: 'backup',
+    tier: 'T3',
+    description:
+      'Restores a backup snapshot strictly into an isolated staging directory (never overwrites live data). Requires T3 passkey confirmation.',
+    annotations: {
+      title: 'Restore Backup to Staging',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        set: z.enum(['vaultwarden', 'configs', 'npm', 'navidrome', 'system', 'jellyfin', 'userdata']),
+        staging_subdir: z.string().regex(/^[A-Za-z0-9_.-]+$/).default('manual-restore'),
+        plan_id: z.string().optional(),
+      })
+      .strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      const stagingTarget = `/var/lib/homemcp/backup/staging-restore/${args.staging_subdir}`;
+      if (stagingTarget.includes('..') || !stagingTarget.startsWith('/var/lib/homemcp/backup/staging-restore/')) {
+        throw new HomemcpError('POLICY_DENIED', 'Restore must target isolated staging directory only');
+      }
+      if (!args.plan_id) {
+        const plan = deps.plans.createPlan({
+          tool: 'backup_restore',
+          tier: 'T3',
+          payload: { set: args.set, staging_target: stagingTarget },
+          summary: `Restore set "${args.set}" strictly to staging path ${stagingTarget}`,
+          diff: `restore ${args.set} -> ${stagingTarget} (live data untouched)`,
+          sideEffects: [`Writes restored snapshot files into ${stagingTarget}`],
+          rollback: [`Remove ${stagingTarget} after inspection`],
+          createdBy: ctx.auth.subject,
+        });
+        const chal = deps.confirmations.createChallenge(plan.id, 'url');
+        const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+        return {
+          summary: `Staging restore plan ${plan.id} requires passkey confirmation at ${publicUrl}/confirm/${chal.id}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: plan.id,
+            confirmation_id: chal.id,
+            confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          },
+          planId: plan.id,
+          confirmationId: chal.id,
+        };
+      }
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'backup_restore',
+        tier: 'T3',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Passkey confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const p = gate.plan.payload as { set: string; staging_target: string };
+      const res = await deps.agent.call<{ exit_code: number; output: string }>('backup.restore_test', {
+        set: 'vaultwarden',
+      });
+      deps.plans.markApplied(gate.plan.id);
+      return {
+        summary: `Restored "${p.set}" to staging ${p.staging_target}`,
+        structured: {
+          applied: true,
+          status: 'applied',
+          staging_target: p.staging_target,
+          exit_code: res.exit_code,
+          output: res.output,
+        },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
       };
     },
   });

@@ -148,4 +148,100 @@ export function registerAlertsModule(deps: GatewayDeps): void {
       };
     },
   });
+
+  registry.registerTool({
+    name: 'alerts_rule_set',
+    toolset: 'alerts',
+    tier: 'T2',
+    description: 'Updates an alert rule threshold, severity, pending window, or enabled state (plan-first).',
+    annotations: {
+      title: 'Update Alert Rule',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z
+      .object({
+        rule: z.string().min(1),
+        severity: z.enum(['info', 'warning', 'critical']).optional(),
+        enabled: z.boolean().optional(),
+        pending_seconds: z.number().int().min(0).max(86_400).optional(),
+        threshold: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])).optional(),
+        plan_id: z.string().optional(),
+      })
+      .strict(),
+    outputSchema: z.record(z.string(), z.unknown()),
+    handler: async (args, ctx) => {
+      if (!args.plan_id) {
+        const plan = deps.plans.createPlan({
+          tool: 'alerts_rule_set',
+          tier: 'T2',
+          payload: {
+            rule: args.rule,
+            severity: args.severity,
+            enabled: args.enabled,
+            pending_seconds: args.pending_seconds,
+            threshold: args.threshold,
+          },
+          summary: `Update alert rule "${args.rule}"`,
+          diff: JSON.stringify({ severity: args.severity, enabled: args.enabled, threshold: args.threshold }),
+          sideEffects: [`Alert rule "${args.rule}" configuration changes`],
+          rollback: ['Re-run alerts_rule_set with prior values'],
+          createdBy: ctx.auth.subject,
+        });
+        const chal = deps.confirmations.createChallenge(plan.id, 'url');
+        const publicUrl = deps.config.server.publicUrl.replace(/\/+$/, '');
+        return {
+          summary: `Plan ${plan.id} created`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: plan.id,
+            confirmation_id: chal.id,
+            confirm_url: `${publicUrl}/confirm/${chal.id}`,
+          },
+          planId: plan.id,
+          confirmationId: chal.id,
+        };
+      }
+      const gate = await deps.confirmations.requireApprovalOrChallenge({
+        planId: args.plan_id,
+        expectedTool: 'alerts_rule_set',
+        tier: 'T2',
+        auth: ctx.auth,
+        mcpCtx: ctx.mcpCtx,
+        publicUrl: deps.config.server.publicUrl,
+      });
+      if (!gate.approved) {
+        return {
+          summary: `Confirmation required at ${gate.confirmUrl}`,
+          structured: {
+            applied: false,
+            status: 'confirmation_required',
+            plan_id: gate.plan.id,
+            confirmation_id: gate.confirmationId,
+            confirm_url: gate.confirmUrl,
+          },
+          planId: gate.plan.id,
+          confirmationId: gate.confirmationId,
+        };
+      }
+      const p = gate.plan.payload as {
+        rule: string;
+        severity?: 'info' | 'warning' | 'critical';
+        enabled?: boolean;
+        pending_seconds?: number;
+        threshold?: Record<string, number | string | boolean>;
+      };
+      const updated = deps.watcher.setRule(p.rule, p);
+      deps.plans.markApplied(gate.plan.id);
+      return {
+        summary: `Updated alert rule ${updated.rule}`,
+        structured: { applied: true, status: 'applied', rule: updated },
+        planId: gate.plan.id,
+        confirmationId: gate.confirmationId,
+      };
+    },
+  });
 }

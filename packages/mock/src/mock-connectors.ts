@@ -1,21 +1,27 @@
-import type {
-  CloudflareConnector,
-  DockerConnector,
-  HealthchecksConnector,
-  HttpProbeConnector,
-  HttpProbeResult,
-  JellyfinConnector,
-  NaviloadConnector,
-  NpmConnector,
-  NtfyConnector,
-  NtfyMessage,
-  QbittorrentConnector,
-  RegistryConnector,
-  SubsonicConnector,
-  SubsonicPlaylist,
-  SubsonicScanStatus,
-  SubsonicSong,
-  VaultwardenConnector,
+import {
+  assertSafeTunnelIngress,
+  type CloudflareAccessApp,
+  type CloudflareConnector,
+  type CloudflareDnsRecord,
+  type CloudflareTunnelConfig,
+  type CreateNpmProxyHostInput,
+  type DockerConnector,
+  type HealthchecksConnector,
+  type HttpProbeConnector,
+  type HttpProbeResult,
+  type JellyfinConnector,
+  type NaviloadConnector,
+  type NpmConnector,
+  type NpmProxyHost,
+  type NtfyConnector,
+  type NtfyMessage,
+  type QbittorrentConnector,
+  type RegistryConnector,
+  type SubsonicConnector,
+  type SubsonicPlaylist,
+  type SubsonicScanStatus,
+  type SubsonicSong,
+  type VaultwardenConnector,
 } from '@homemcp/connectors';
 import { HomemcpError, Redactor } from '@homemcp/core';
 import type { MockState } from './fixtures.js';
@@ -113,6 +119,41 @@ export class MockNpmConnector implements NpmConnector {
   public listAccessLists() {
     return Promise.resolve(this.state.npmAccessLists);
   }
+
+  public createProxyHost(input: CreateNpmProxyHostInput): Promise<NpmProxyHost> {
+    const id = this.state.npmHosts.reduce((m, h) => Math.max(m, h.id), 0) + 1;
+    const host: NpmProxyHost = {
+      id,
+      domain_names: input.domain_names,
+      forward_scheme: input.forward_scheme ?? 'http',
+      forward_host: input.forward_host,
+      forward_port: input.forward_port,
+      certificate_id: input.certificate_id ?? 2,
+      access_list_id: input.access_list_id ?? 0,
+      ssl_forced: input.ssl_forced ?? true,
+      block_exploits: input.block_exploits ?? true,
+      allow_websocket_upgrade: input.allow_websocket_upgrade ?? true,
+      caching_enabled: input.caching_enabled ?? false,
+      enabled: input.enabled ?? true,
+      certificate: { id: 2, nice_name: '*.example.com', expires_on: '2027-02-01T00:00:00Z' },
+    };
+    this.state.npmHosts.push(host);
+    return Promise.resolve(host);
+  }
+
+  public updateProxyHost(id: number, input: Partial<CreateNpmProxyHostInput>): Promise<NpmProxyHost> {
+    const host = this.state.npmHosts.find((h) => h.id === id);
+    if (!host) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `NPM proxy host ${id} not found`));
+    }
+    Object.assign(host, input);
+    return Promise.resolve(host);
+  }
+
+  public deleteProxyHost(id: number): Promise<void> {
+    this.state.npmHosts = this.state.npmHosts.filter((h) => h.id !== id);
+    return Promise.resolve();
+  }
 }
 
 export class MockCloudflareConnector implements CloudflareConnector {
@@ -137,6 +178,76 @@ export class MockCloudflareConnector implements CloudflareConnector {
 
   public listAccessApps() {
     return Promise.resolve(this.state.cfAccessApps);
+  }
+
+  public updateTunnelIngress(
+    mutateFn: (current: CloudflareTunnelConfig['config']) => CloudflareTunnelConfig['config'],
+  ): Promise<{ previous: CloudflareTunnelConfig; current: CloudflareTunnelConfig }> {
+    const previous = structuredClone(this.state.cfTunnelConfig);
+    const nextConfig = mutateFn(structuredClone(previous.config));
+    assertSafeTunnelIngress(previous.config, nextConfig);
+    const next: CloudflareTunnelConfig = {
+      version: previous.version + 1,
+      config: nextConfig,
+    };
+    this.state.cfTunnelConfig = next;
+    return Promise.resolve({ previous, current: next });
+  }
+
+  public upsertDnsCname(zoneName: string, hostname: string): Promise<CloudflareDnsRecord> {
+    if (this.state.failNextCfDns) {
+      this.state.failNextCfDns = false;
+      return Promise.reject(new HomemcpError('UPSTREAM_UNAVAILABLE', 'Simulated Cloudflare DNS failure'));
+    }
+    const existing = this.state.cfDnsRecords.find((r) => r.name === hostname);
+    if (existing) {
+      existing.content = 'tun-mock.cfargotunnel.com';
+      return Promise.resolve(existing);
+    }
+    const created: CloudflareDnsRecord = {
+      id: `dns-${this.state.cfDnsRecords.length + 1}`,
+      zone_id: 'z1',
+      zone_name: zoneName,
+      name: hostname,
+      type: 'CNAME',
+      content: 'tun-mock.cfargotunnel.com',
+      proxied: true,
+    };
+    this.state.cfDnsRecords.push(created);
+    return Promise.resolve(created);
+  }
+
+  public deleteDnsCname(_zoneId: string, recordId: string): Promise<void> {
+    const rec = this.state.cfDnsRecords.find((r) => r.id === recordId);
+    if (!rec) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `DNS record not found: ${recordId}`));
+    }
+    if (rec.type !== 'CNAME' || rec.content !== 'tun-mock.cfargotunnel.com') {
+      return Promise.reject(new HomemcpError('POLICY_DENIED', 'DNS record target does not match tunnel'));
+    }
+    this.state.cfDnsRecords = this.state.cfDnsRecords.filter((r) => r.id !== recordId);
+    return Promise.resolve();
+  }
+
+  public upsertAccessApp(opts: { name: string; domain: string }): Promise<CloudflareAccessApp> {
+    const existing = this.state.cfAccessApps.find((a) => a.domain === opts.domain);
+    if (existing) {
+      existing.name = opts.name;
+      return Promise.resolve(existing);
+    }
+    const created: CloudflareAccessApp = {
+      id: `app-${this.state.cfAccessApps.length + 1}`,
+      name: opts.name,
+      domain: opts.domain,
+      type: 'self_hosted',
+    };
+    this.state.cfAccessApps.push(created);
+    return Promise.resolve(created);
+  }
+
+  public deleteAccessApp(appId: string): Promise<void> {
+    this.state.cfAccessApps = this.state.cfAccessApps.filter((a) => a.id !== appId);
+    return Promise.resolve();
   }
 }
 
