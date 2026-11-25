@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createSqliteAdapterFactory } from '../src/auth/adapter.js';
 import { fetchCimdMetadata } from '../src/auth/cimd.js';
 import { startHttpGateway, type HttpGatewayHandle } from '../src/auth/http-server.js';
 import { isIpAllowedByCidrs } from '../src/auth/pats.js';
@@ -337,5 +338,38 @@ describe('Phase 2 Auth & HTTP Gateway E2E', () => {
     expect(csp).toContain("default-src 'none'");
     expect(csp).toContain("connect-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
+  });
+
+  it('intersects CIMD grant_types and response_types with supported OAuth flows', async () => {
+    const gw = createGatewayDeps({ mock: true });
+    try {
+      const clientUrl = 'https://client.example.org/oauth/metadata.json';
+      const meta = {
+        client_id: clientUrl,
+        client_name: 'Example CIMD Client',
+        redirect_uris: ['https://client.example.org/callback'],
+        grant_types: [
+          'authorization_code',
+          'refresh_token',
+          'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        ],
+        response_types: ['code', 'token'],
+        token_endpoint_auth_method: 'none',
+      };
+      const now = Date.now();
+      gw.db.db
+        .prepare(
+          `INSERT INTO cimd_cache (client_id_url, metadata_json, fetched_at, expires_at)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run(clientUrl, JSON.stringify(meta), now, now + 600_000);
+
+      const Adapter = createSqliteAdapterFactory(gw.db);
+      const resolved = await new Adapter('Client').find(clientUrl);
+      expect(resolved?.['grant_types']).toEqual(['authorization_code', 'refresh_token']);
+      expect(resolved?.['response_types']).toEqual(['code']);
+    } finally {
+      gw.db.close();
+    }
   });
 });

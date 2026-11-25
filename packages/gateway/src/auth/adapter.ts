@@ -2,6 +2,9 @@ import type { Adapter, AdapterConstructor, AdapterPayload } from 'oidc-provider'
 import type { HomemcpDb } from '../db/database.js';
 import { fetchCimdMetadata, isCimdClientId } from './cimd.js';
 
+const SUPPORTED_CIMD_GRANT_TYPES = new Set(['authorization_code', 'refresh_token']);
+const SUPPORTED_CIMD_RESPONSE_TYPES = new Set(['code']);
+
 export function createSqliteAdapterFactory(db: HomemcpDb): AdapterConstructor {
   return class SqliteOidcAdapter implements Adapter {
     private readonly model: string;
@@ -49,12 +52,21 @@ export function createSqliteAdapterFactory(db: HomemcpDb): AdapterConstructor {
         if (this.model === 'Client' && isCimdClientId(id)) {
           try {
             const meta = await fetchCimdMetadata(id, db);
+            const grantTypes = meta.grant_types?.filter((g) => SUPPORTED_CIMD_GRANT_TYPES.has(g));
+            const responseTypes = meta.response_types?.filter((r) =>
+              SUPPORTED_CIMD_RESPONSE_TYPES.has(r),
+            );
             return {
               client_id: meta.client_id,
               client_name: meta.client_name,
               redirect_uris: meta.redirect_uris,
-              grant_types: meta.grant_types ?? ['authorization_code', 'refresh_token'],
-              response_types: (meta.response_types ?? ['code']) as AdapterPayload['response_types'],
+              grant_types:
+                grantTypes && grantTypes.length > 0
+                  ? grantTypes
+                  : ['authorization_code', 'refresh_token'],
+              response_types: (responseTypes && responseTypes.length > 0
+                ? responseTypes
+                : ['code']) as AdapterPayload['response_types'],
               token_endpoint_auth_method: (meta.token_endpoint_auth_method ??
                 'none') as AdapterPayload['token_endpoint_auth_method'],
               ...(meta.scope ? { scope: meta.scope } : {}),
