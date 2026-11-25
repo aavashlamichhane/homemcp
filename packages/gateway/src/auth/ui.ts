@@ -65,6 +65,26 @@ function verifySessionCookie(
   }
 }
 
+function buildCspHeader(nonce: string, formAction = "'self'"): string {
+  return `default-src 'none'; connect-src 'self'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src 'self' data:; form-action ${formAction}; frame-ancestors 'none'`;
+}
+
+function cspFormActionForRedirect(redirectUri: string): string {
+  if (!redirectUri) return "'self'";
+  try {
+    const u = new URL(redirectUri);
+    if ((u.protocol === 'https:' || u.protocol === 'http:') && u.origin && u.origin !== 'null') {
+      return `'self' ${u.origin}`;
+    }
+    if (/^[a-z][a-z0-9+.-]*:$/i.test(u.protocol)) {
+      return `'self' ${u.protocol}`;
+    }
+  } catch {
+    // ignore malformed URI and fall back to strict 'self'
+  }
+  return "'self'";
+}
+
 function renderLayout(title: string, body: string, nonce: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -116,6 +136,28 @@ async function runPasskeyAuth(beginUrl, finishUrl, extraBody){
   const j=await r2.json();if(!r2.ok)throw new Error(j.error||'Auth verify failed');return j;
 }`;
 
+const FORM_SUBMIT_HELPER_JS = `
+for(const f of document.querySelectorAll('form[data-json-redirect]')){
+  f.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const errEl=document.getElementById('form-err');
+    if(errEl)errEl.textContent='';
+    const btns=[...document.querySelectorAll('button[type="submit"]')];
+    for(const b of btns)b.disabled=true;
+    try{
+      const body=new URLSearchParams(new FormData(f));
+      const r=await fetch(f.action,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',accept:'application/json'},body});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.error||'Request failed ('+r.status+')');
+      if(j.redirectTo){location.href=j.redirectTo;return;}
+      for(const b of btns)b.disabled=false;
+    }catch(err){
+      if(errEl)errEl.textContent=err instanceof Error?err.message:String(err);
+      for(const b of btns)b.disabled=false;
+    }
+  });
+}`;
+
 export function registerAuthUiRoutes(
   app: Express,
   deps: {
@@ -139,10 +181,7 @@ export function registerAuthUiRoutes(
     ) {
       const nonce = randomBytes(16).toString('base64');
       res.locals['cspNonce'] = nonce;
-      res.setHeader(
-        'Content-Security-Policy',
-        `default-src 'none'; connect-src 'self'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'`,
-      );
+      res.setHeader('Content-Security-Policy', buildCspHeader(nonce));
       res.setHeader('X-Frame-Options', 'DENY');
       res.setHeader('Referrer-Policy', 'no-referrer');
     }
@@ -238,6 +277,11 @@ export function registerAuthUiRoutes(
       const details = await provider.interactionDetails(req, res);
       const { uid, prompt, params } = details;
       const clientId = typeof params['client_id'] === 'string' ? params['client_id'] : 'unknown';
+      const redirectUri = typeof params['redirect_uri'] === 'string' ? params['redirect_uri'] : '';
+      res.setHeader(
+        'Content-Security-Policy',
+        buildCspHeader(nonce, cspFormActionForRedirect(redirectUri)),
+      );
 
       if (prompt.name === 'login') {
         const html = renderLayout(
@@ -247,11 +291,12 @@ export function registerAuthUiRoutes(
           <button id="btn-pk">Sign in with Passkey</button>
           <p id="pk-err" class="err"></p>
           <hr />
-          <form method="post" action="/oauth/interaction/${escapeHtml(uid)}/totp">
+          <form data-json-redirect="1" method="post" action="/oauth/interaction/${escapeHtml(uid)}/totp">
             <label>Or TOTP / Recovery Code<input name="code" type="text" autocomplete="one-time-code" required /></label>
             <button type="submit">Verify Code</button>
           </form>
-          <script nonce="${nonce}">${WEBAUTHN_HELPER_JS}
+          <p id="form-err" class="err"></p>
+          <script nonce="${nonce}">${WEBAUTHN_HELPER_JS}${FORM_SUBMIT_HELPER_JS}
           document.getElementById('btn-pk').onclick=async()=>{
             try{
               const r=await runPasskeyAuth('/oauth/interaction/${encodeURIComponent(uid)}/webauthn/begin','/oauth/interaction/${encodeURIComponent(uid)}/webauthn/finish',{});
@@ -269,8 +314,6 @@ export function registerAuthUiRoutes(
         const reqScopes = reqScopeStr.split(/\s+/).filter(Boolean);
         const homemcpScopes = ALL_SCOPES.filter((s) => reqScopes.includes(s));
         const scopesToShow = homemcpScopes.length > 0 ? homemcpScopes : ['homemcp:read'];
-        const redirectUri =
-          typeof params['redirect_uri'] === 'string' ? params['redirect_uri'] : '';
 
         const checkboxes = scopesToShow
           .map(
@@ -284,15 +327,17 @@ export function registerAuthUiRoutes(
           `<h1>Authorize Client</h1>
           <p><strong>Client:</strong> <code>${escapeHtml(clientId)}</code></p>
           <p class="muted">Redirect URI: <code>${escapeHtml(redirectUri)}</code></p>
-          <form method="post" action="/oauth/interaction/${escapeHtml(uid)}/confirm">
+          <form data-json-redirect="1" method="post" action="/oauth/interaction/${escapeHtml(uid)}/confirm">
             <h3>Permitted Scopes (untick to downgrade)</h3>
             ${checkboxes}
             <br />
             <button type="submit">Approve</button>
           </form>
-          <form method="post" action="/oauth/interaction/${escapeHtml(uid)}/abort" style="margin-top:.75rem">
+          <form data-json-redirect="1" method="post" action="/oauth/interaction/${escapeHtml(uid)}/abort" style="margin-top:.75rem">
             <button type="submit" class="danger">Deny</button>
-          </form>`,
+          </form>
+          <p id="form-err" class="err"></p>
+          <script nonce="${nonce}">${FORM_SUBMIT_HELPER_JS}</script>`,
           nonce,
         );
         res.type('html').send(html);
@@ -357,23 +402,38 @@ export function registerAuthUiRoutes(
     '/oauth/interaction/:uid/totp',
     express.urlencoded({ extended: false }),
     async (req, res) => {
+      const wantsJson = Boolean(req.headers.accept?.includes('application/json'));
       try {
         const code = String((req.body as { code?: string })?.code ?? '');
         const ok = await authService.verifyTotpOrRecovery(code);
         if (!ok) {
+          if (wantsJson) {
+            res.status(403).json({ error: 'Invalid TOTP or recovery code' });
+            return;
+          }
           res.status(403).send('Invalid TOTP or recovery code');
           return;
         }
         const nowSec = Math.floor(Date.now() / 1000);
         setSession(res, nowSec);
-        await provider.interactionFinished(
-          req,
-          res,
-          { login: { accountId: 'owner', ts: nowSec } },
-          { mergeWithLastSubmission: false },
-        );
+        const result = { login: { accountId: 'owner', ts: nowSec } };
+        if (wantsJson) {
+          const redirectTo = await provider.interactionResult(req, res, result, {
+            mergeWithLastSubmission: false,
+          });
+          res.json({ ok: true, redirectTo });
+          return;
+        }
+        await provider.interactionFinished(req, res, result, {
+          mergeWithLastSubmission: false,
+        });
       } catch (err) {
-        res.status(403).send(err instanceof Error ? err.message : 'TOTP error');
+        const msg = err instanceof Error ? err.message : 'TOTP error';
+        if (wantsJson) {
+          res.status(403).json({ error: msg });
+          return;
+        }
+        res.status(403).send(msg);
       }
     },
   );
@@ -382,6 +442,7 @@ export function registerAuthUiRoutes(
     '/oauth/interaction/:uid/confirm',
     express.urlencoded({ extended: false }),
     async (req, res) => {
+      const wantsJson = Boolean(req.headers.accept?.includes('application/json'));
       try {
         const details = await provider.interactionDetails(req, res);
         const rawScopes = (req.body as { scopes?: string | string[] })?.scopes;
@@ -401,6 +462,10 @@ export function registerAuthUiRoutes(
               clientId: String(details.params['client_id']),
             });
         if (!grant) {
+          if (wantsJson) {
+            res.status(400).json({ error: 'Grant not found' });
+            return;
+          }
           res.status(400).send('Grant not found');
           return;
         }
@@ -436,25 +501,50 @@ export function registerAuthUiRoutes(
         }
 
         const grantId = await grant.save();
-        await provider.interactionFinished(
-          req,
-          res,
-          { consent: { grantId } },
-          { mergeWithLastSubmission: true },
-        );
+        const result = { consent: { grantId } };
+        if (wantsJson) {
+          const redirectTo = await provider.interactionResult(req, res, result, {
+            mergeWithLastSubmission: true,
+          });
+          res.json({ ok: true, redirectTo });
+          return;
+        }
+        await provider.interactionFinished(req, res, result, {
+          mergeWithLastSubmission: true,
+        });
       } catch (err) {
-        res.status(400).send(err instanceof Error ? err.message : 'Consent error');
+        const msg = err instanceof Error ? err.message : 'Consent error';
+        if (wantsJson) {
+          res.status(400).json({ error: msg });
+          return;
+        }
+        res.status(400).send(msg);
       }
     },
   );
 
   app.post('/oauth/interaction/:uid/abort', async (req, res) => {
-    await provider.interactionFinished(
-      req,
-      res,
-      { error: 'access_denied', error_description: 'Owner denied request' },
-      { mergeWithLastSubmission: false },
-    );
+    const wantsJson = Boolean(req.headers.accept?.includes('application/json'));
+    const result = { error: 'access_denied', error_description: 'Owner denied request' };
+    try {
+      if (wantsJson) {
+        const redirectTo = await provider.interactionResult(req, res, result, {
+          mergeWithLastSubmission: false,
+        });
+        res.json({ ok: true, redirectTo });
+        return;
+      }
+      await provider.interactionFinished(req, res, result, {
+        mergeWithLastSubmission: false,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Abort error';
+      if (wantsJson) {
+        res.status(400).json({ error: msg });
+        return;
+      }
+      res.status(400).send(msg);
+    }
   });
 
   // 3) Account management & one-time PAT reveal

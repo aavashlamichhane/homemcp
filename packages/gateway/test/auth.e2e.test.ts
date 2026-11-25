@@ -188,20 +188,33 @@ describe('Phase 2 Auth & HTTP Gateway E2E', () => {
     expect(resume1.status).toBe(303);
     const consentLoc = new URL(resume1.headers.get('location')!, baseUrl);
 
-    // Approve ONLY homemcp:read (downgrading operate & admin!)
+    // Consent page CSP must whitelist the client's validated redirect origin alongside 'self'
+    const consentPage = await fetch(consentLoc, {
+      headers: { cookie: jar.header() },
+      redirect: 'manual',
+    });
+    expect(consentPage.status).toBe(200);
+    const consentCsp = consentPage.headers.get('content-security-policy') ?? '';
+    expect(consentCsp).toContain("form-action 'self' http://127.0.0.1:43210");
+
+    // Approve ONLY homemcp:read (downgrading operate & admin!) using JSON redirect mode
     const consentSubmit = await fetch(new URL(`${consentLoc.pathname}/confirm`, baseUrl), {
       method: 'POST',
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
+        accept: 'application/json',
         cookie: jar.header(),
       },
       body: new URLSearchParams({ scopes: 'homemcp:read' }),
       redirect: 'manual',
     });
     jar.capture(consentSubmit);
-    expect(consentSubmit.status).toBe(303);
+    expect(consentSubmit.status).toBe(200);
+    const consentJson = (await consentSubmit.json()) as { ok: boolean; redirectTo: string };
+    expect(consentJson.ok).toBe(true);
+    expect(consentJson.redirectTo).toBeTruthy();
 
-    const resume2 = await fetch(new URL(consentSubmit.headers.get('location')!, baseUrl), {
+    const resume2 = await fetch(new URL(consentJson.redirectTo, baseUrl), {
       headers: { cookie: jar.header() },
       redirect: 'manual',
     });
