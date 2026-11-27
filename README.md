@@ -98,17 +98,17 @@ Full step-by-step instructions are in [docs/deployment.md](docs/deployment.md), 
 
 ## Repository Structure
 
-| Path                                                   | Description                                                                                                                                                   |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`packages/core`](packages/core/README.md)             | Shared types, error model (`HomemcpError`), tier/scope rules, centralized redactor, YAML config loader, Compose policy validator, path confinement            |
-| [`packages/connectors`](packages/connectors/README.md) | Typed HTTP/API clients for Docker, NPM, Cloudflare, Subsonic/Navidrome, NaviLoad, Jellyfin, qBittorrent, Vaultwarden, `ntfy`, Healthchecks.io, and `homemcpd` |
-| [`packages/agent`](packages/agent/README.md)           | Privileged Linux host daemon (`homemcpd`): HMAC socket server, binary allowlist runner, and strict Zod-validated host verbs                                   |
-| [`packages/gateway`](packages/gateway/README.md)       | MCP server (`stdio` / HTTP), OAuth 2.1 + WebAuthn + PAT auth server, SQLite job/plan/alert stores, background watcher, and all 15 tool modules                |
-| [`packages/mock`](packages/mock/README.md)             | Stateful in-memory fixtures, `MockExecutor`, and mock HTTP connectors for zero-risk local testing and CI evals                                                |
-| [`templates`](templates/README.md)                     | Curated Compose service templates (`actual-budget`, `homepage`, `it-tools`, `ntfy`, `searxng`, `shlink`, `uptime-kuma`)                                       |
-| [`deploy`](deploy/README.md)                           | Systemd units, sudoers rules, staged host installer scripts, and hardened gateway Dockerfile/Compose                                                          |
-| [`evals`](evals/README.md)                             | Deterministic 40-task functional, security, safety, and prompt-injection evaluation suite                                                                     |
-| [`docs`](docs/architecture.md)                         | Architecture, threat model, auth, backup guide, feature catalog, client setup, runbooks, and auto-generated tool docs                                         |
+| Path                                                   | Description                                                                                                                                                            |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/core`](packages/core/README.md)             | Shared types, error model (`HomemcpError`), tier/scope rules, centralized redactor, YAML config loader, Compose policy validator, path confinement                     |
+| [`packages/connectors`](packages/connectors/README.md) | Typed HTTP/API clients for Docker, NPM, Cloudflare, Subsonic/Navidrome, NaviLoad, Jellyfin, qBittorrent, Jackett, Vaultwarden, `ntfy`, Healthchecks.io, and `homemcpd` |
+| [`packages/agent`](packages/agent/README.md)           | Privileged Linux host daemon (`homemcpd`): HMAC socket server, binary allowlist runner, and strict Zod-validated host verbs                                            |
+| [`packages/gateway`](packages/gateway/README.md)       | MCP server (`stdio` / HTTP), OAuth 2.1 + WebAuthn + PAT auth server, SQLite job/plan/alert stores, background watcher, and all 15 tool modules                         |
+| [`packages/mock`](packages/mock/README.md)             | Stateful in-memory fixtures, `MockExecutor`, and mock HTTP connectors for zero-risk local testing and CI evals                                                         |
+| [`templates`](templates/README.md)                     | Curated Compose service templates (`actual-budget`, `homepage`, `it-tools`, `ntfy`, `searxng`, `shlink`, `uptime-kuma`)                                                |
+| [`deploy`](deploy/README.md)                           | Systemd units, sudoers rules, staged host installer scripts, and hardened gateway Dockerfile/Compose                                                                   |
+| [`evals`](evals/README.md)                             | Deterministic 40-task functional, security, safety, and prompt-injection evaluation suite                                                                              |
+| [`docs`](docs/architecture.md)                         | Architecture, threat model, auth, backup guide, feature catalog, client setup, runbooks, and auto-generated tool docs                                                  |
 
 ---
 
