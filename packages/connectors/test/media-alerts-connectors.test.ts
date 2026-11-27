@@ -26,6 +26,9 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
   }
 
   it('HttpJellyfinConnector authenticates via X-Emby-Token and reads health, sessions, and items', async () => {
+    let updatedPayload: Record<string, unknown> | undefined;
+    let appliedPayload: Record<string, unknown> | undefined;
+    let refreshQuery = '';
     const url = await startMockServer((req, res) => {
       if (req.url === '/health') {
         res.writeHead(200);
@@ -41,6 +44,77 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
       if (req.url === '/Sessions') {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify([{ Id: 'sess-1', UserName: 'alice' }]));
+        return;
+      }
+      if (req.url === '/Users') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify([{ Id: 'u-admin', Policy: { IsAdministrator: true } }]));
+        return;
+      }
+      if (req.url === '/Users/u-admin/Items/s1') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            Id: 's1',
+            Name: 'Sample Series',
+            Type: 'Series',
+            Genres: ['Animation'],
+            Tags: [],
+            Studios: [{ Name: 'Studio A', Id: 'st-1' }],
+            ProviderIds: { Tmdb: '100' },
+          }),
+        );
+        return;
+      }
+      if (req.url === '/Users/u-admin/Items/missing-id') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      if (req.url === '/Items/RemoteSearch/Series' && req.method === 'POST') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify([
+            {
+              Name: 'Sample Series',
+              ProductionYear: 2024,
+              SearchProviderName: 'TheMovieDb',
+              ProviderIds: { Tmdb: '100' },
+            },
+          ]),
+        );
+        return;
+      }
+      if (req.url?.startsWith('/Items/RemoteSearch/Apply/s1') && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', () => {
+          appliedPayload = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+            string,
+            unknown
+          >;
+          res.writeHead(204);
+          res.end();
+        });
+        return;
+      }
+      if (req.url?.startsWith('/Items/s1/Refresh?') && req.method === 'POST') {
+        refreshQuery = req.url;
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      if (req.url === '/Items/s1' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', () => {
+          updatedPayload = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+            string,
+            unknown
+          >;
+          res.writeHead(204);
+          res.end();
+        });
         return;
       }
       if (req.url?.startsWith('/Items')) {
@@ -62,11 +136,31 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
     expect((await jf.getSystemInfo()).Version).toBe('10.11.8');
     expect(await jf.getSessions()).toHaveLength(1);
     expect((await jf.searchItems({ searchTerm: 'Movie' })).Items).toHaveLength(1);
+    expect((await jf.getItemChildren('s1', { recursive: true })).Items).toHaveLength(1);
+
+    const hits = await jf.remoteSearch('Series', { name: 'Sample Series', year: 2024 });
+    expect(hits).toHaveLength(1);
+    await jf.applyRemoteSearchResult('s1', hits[0]!, true);
+    expect(appliedPayload?.['Name']).toBe('Sample Series');
+
+    await jf.refreshItem('s1', { metadataRefreshMode: 'FullRefresh' });
+    expect(refreshQuery).toContain('metadataRefreshMode=FullRefresh');
+
+    await jf.updateItemMetadata('s1', {
+      displayOrder: 'absolute',
+      providerIds: { Tvdb: '200' },
+    });
+    expect(updatedPayload?.['DisplayOrder']).toBe('absolute');
+    expect(updatedPayload?.['Genres']).toEqual(['Animation']);
+    expect(updatedPayload?.['ProviderIds']).toEqual({ Tmdb: '100', Tvdb: '200' });
+
+    await expect(jf.getItem('missing-id')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('HttpQbittorrentConnector logs in, reuses SID cookie, and adds/controls torrents', async () => {
+  it('HttpQbittorrentConnector logs in, reuses SID cookie, and adds/controls/renames torrents', async () => {
     let loginCount = 0;
     const seenPaths: string[] = [];
+    const seenBodies: Record<string, string> = {};
     const url = await startMockServer((req, res) => {
       seenPaths.push(req.url ?? '/');
       if (req.url === '/api/v2/auth/login') {
@@ -124,6 +218,26 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
         res.end();
         return;
       }
+      if (
+        req.url === '/api/v2/torrents/renameFile' ||
+        req.url === '/api/v2/torrents/renameFolder' ||
+        req.url === '/api/v2/torrents/setLocation'
+      ) {
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          seenBodies[req.url!] = body;
+          if (body.includes('collision.mkv')) {
+            res.writeHead(409);
+            res.end('newPath already in use');
+            return;
+          }
+          res.writeHead(200);
+          res.end('Ok.');
+        });
+        return;
+      }
       res.writeHead(200);
       res.end('Ok.');
     });
@@ -144,6 +258,15 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
       filename: 'sample.torrent',
       data: new Uint8Array([1, 2, 3]),
       category: 'movies',
+    });
+    await qb.renameFile('0123456789', 'raw.mkv', 'Clean Movie (2024).mkv');
+    await qb.renameFolder('0123456789', 'Raw Folder', 'Clean Folder (2024)');
+    await qb.setLocation(['0123456789'], '/mnt/storage/media/movies');
+    expect(seenBodies['/api/v2/torrents/renameFile']).toContain('Clean+Movie');
+    expect(seenBodies['/api/v2/torrents/renameFolder']).toContain('Clean+Folder');
+    expect(seenBodies['/api/v2/torrents/setLocation']).toContain('%2Fmnt%2Fstorage');
+    await expect(qb.renameFile('0123456789', 'raw.mkv', 'collision.mkv')).rejects.toMatchObject({
+      code: 'CONFLICT',
     });
     expect(loginCount).toBe(1);
     expect(files).toHaveLength(1);

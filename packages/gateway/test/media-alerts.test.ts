@@ -89,17 +89,164 @@ describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
     expect(jfHealth.structuredContent['active_transcodes']).toBe(1);
 
     const jfProblems = await client.callTool('jellyfin_find_problems', { limit: 50 });
-    expect(
-      (jfProblems.structuredContent['unidentified'] as unknown[]).length,
-    ).toBeGreaterThanOrEqual(1);
+    const unidentifiedList = jfProblems.structuredContent['unidentified'] as Array<
+      Record<string, unknown>
+    >;
+    expect(unidentifiedList.some((u) => u['type'] === 'Movie')).toBe(true);
+    expect(unidentifiedList.some((u) => u['type'] === 'Series')).toBe(true);
     expect(
       (jfProblems.structuredContent['naming_issues'] as unknown[]).length,
     ).toBeGreaterThanOrEqual(1);
+
+    // Jellyfin item inspect, Identify search/apply, metadata edit, and refresh
+    const seriesInspect = await client.callTool('jellyfin_item_inspect', { item_id: 'jf-s1' });
+    expect(seriesInspect.structuredContent['total_children']).toBeGreaterThanOrEqual(1);
+    expect(seriesInspect.structuredContent['untrusted_source']).toBe('jellyfin-metadata');
+
+    const epSearchDenied = await client.callTool('jellyfin_identify_search', { item_id: 'jf-ep1' });
+    expect(epSearchDenied.isError).toBe(true);
+    expect((epSearchDenied.structuredContent['error'] as { code: string }).code).toBe(
+      'INVALID_ARGUMENT',
+    );
+
+    const seriesIdentify = await client.callTool('jellyfin_identify_search', {
+      item_id: 'jf-s1',
+      name: 'Sample Anime',
+      year: 2024,
+    });
+    expect(seriesIdentify.structuredContent['item_type']).toBe('Series');
+    const jfCands = seriesIdentify.structuredContent['candidates'] as Array<
+      Record<string, unknown>
+    >;
+    expect(jfCands.length).toBeGreaterThanOrEqual(1);
+    const matchId = String(jfCands[0]?.['match_id']);
+
+    const mismatchApply = await client.callTool('jellyfin_identify_apply', {
+      item_id: 'jf-m2',
+      match_id: matchId,
+    });
+    expect(mismatchApply.isError).toBe(true);
+    expect((mismatchApply.structuredContent['error'] as { code: string }).code).toBe(
+      'INVALID_ARGUMENT',
+    );
+
+    const seriesApply = await client.callTool('jellyfin_identify_apply', {
+      item_id: 'jf-s1',
+      match_id: matchId,
+    });
+    expect(seriesApply.structuredContent['applied']).toBe(true);
+
+    const movieIdentify = await client.callTool('jellyfin_identify_search', {
+      item_id: 'jf-m2',
+      name: 'Sample Movie',
+    });
+    const movieMatchId = String(
+      (movieIdentify.structuredContent['candidates'] as Array<Record<string, unknown>>)[0]?.[
+        'match_id'
+      ],
+    );
+    const movieApply = await client.callTool('jellyfin_identify_apply', {
+      item_id: 'jf-m2',
+      match_id: movieMatchId,
+    });
+    expect(movieApply.structuredContent['applied']).toBe(true);
+
+    const metaUpdate = await client.callTool('jellyfin_item_update_metadata', {
+      item_id: 'jf-s1',
+      display_order: 'absolute',
+      lock_data: true,
+    });
+    expect(metaUpdate.structuredContent['updated']).toBe(true);
+    expect(metaUpdate.structuredContent['refresh_queued']).toBe(true);
+
+    const epMetaUpdate = await client.callTool('jellyfin_item_update_metadata', {
+      item_id: 'jf-ep1',
+      parent_index_number: 1,
+      index_number: 1,
+      refresh_after: true,
+    });
+    expect(epMetaUpdate.structuredContent['updated']).toBe(true);
+
+    const refreshRes = await client.callTool('jellyfin_refresh_item', {
+      item_id: 'jf-s1',
+      mode: 'full',
+    });
+    expect(refreshRes.structuredContent['queued']).toBe(true);
 
     const jfRunTask = await client.callTool('jellyfin_run_task', {
       task_id_or_name: 'Scan Media Library',
     });
     expect(jfRunTask.structuredContent['triggered']).toBe(true);
+
+    // Media rename: seeding-safe qBittorrent file & folder rename + outside-save_path conflict guard
+    const outsideMoveBlocked = await client.callTool('media_rename_plan', {
+      moves: [
+        {
+          src: '/mnt/storage/media/jellyfin/series/[Fansub] Sample Anime S1/ep01.mkv',
+          dst: '/mnt/storage/media/jellyfin/movies/ep01.mkv',
+        },
+      ],
+    });
+    expect(outsideMoveBlocked.isError).toBe(true);
+    expect((outsideMoveBlocked.structuredContent['error'] as { code: string }).code).toBe(
+      'CONFLICT',
+    );
+
+    const qbitFilePlan = await client.callTool('media_rename_plan', {
+      moves: [
+        {
+          src: '/mnt/storage/media/jellyfin/series/[Fansub] Sample Anime S1/ep01.mkv',
+          dst: '/mnt/storage/media/jellyfin/series/[Fansub] Sample Anime S1/Sample Anime - S01E01.mkv',
+        },
+      ],
+    });
+    expect(qbitFilePlan.structuredContent['qbit_preserved_count']).toBe(1);
+    expect(qbitFilePlan.structuredContent['fs_move_count']).toBe(0);
+    deps.confirmations.approveConfirmation(
+      String(qbitFilePlan.structuredContent['confirmation_id']),
+      {
+        approvedBy: 'owner',
+      },
+    );
+    const qbitFileApply = await client.callTool('media_rename_apply', {
+      plan_id: String(qbitFilePlan.structuredContent['plan_id']),
+    });
+    expect(qbitFileApply.structuredContent['applied']).toBe(true);
+    expect(qbitFileApply.structuredContent['qbit_renamed_count']).toBe(1);
+    expect(qbitFileApply.structuredContent['jellyfin_scan_triggered']).toBe(true);
+
+    const qbitFolderPlan = await client.callTool('media_rename_plan', {
+      moves: [
+        {
+          src: '/mnt/storage/media/jellyfin/series/[Fansub] Sample Anime S1',
+          dst: '/mnt/storage/media/jellyfin/series/Sample Anime (2024)',
+        },
+      ],
+    });
+    expect(qbitFolderPlan.structuredContent['qbit_preserved_count']).toBe(1);
+    deps.confirmations.approveConfirmation(
+      String(qbitFolderPlan.structuredContent['confirmation_id']),
+      { approvedBy: 'owner' },
+    );
+    const qbitFolderApply = await client.callTool('media_rename_apply', {
+      plan_id: String(qbitFolderPlan.structuredContent['plan_id']),
+    });
+    expect(qbitFolderApply.structuredContent['qbit_renamed_count']).toBe(1);
+    const updatedSeriesFiles = await deps.qbittorrent!.getTorrentFiles(
+      '11223344556677889900aabbccddeeff00112233',
+    );
+    expect(updatedSeriesFiles[0]?.name).toBe('Sample Anime (2024)/Sample Anime - S01E01.mkv');
+
+    const fsPlan = await client.callTool('media_rename_plan', {
+      moves: [
+        {
+          src: '/mnt/storage/media/jellyfin/movies/non_torrent_film.mkv',
+          dst: '/mnt/storage/media/jellyfin/movies/Non Torrent Film (2024)/Non Torrent Film (2024).mkv',
+        },
+      ],
+    });
+    expect(fsPlan.structuredContent['qbit_preserved_count']).toBe(0);
+    expect(fsPlan.structuredContent['fs_move_count']).toBe(1);
 
     // Downloads: valid add succeeds, huge min_free_bytes denied with CONFLICT
     const dlAddOk = await client.callTool('downloads_add', {

@@ -181,6 +181,16 @@ export const HomemcpConfigSchema = z
           .object({
             url: z.string().url(),
             apiKey: EnvRefSchema,
+            pathMappings: z
+              .array(
+                z
+                  .object({
+                    containerPrefix: z.string().min(1),
+                    hostPrefix: z.string().min(1),
+                  })
+                  .strict(),
+              )
+              .default([]),
           })
           .strict()
           .optional(),

@@ -119,6 +119,9 @@ modules:
   jellyfin:
     url: http://192.0.2.10:8096
     apiKey: env:JELLYFIN_API_KEY
+    pathMappings:
+      - containerPrefix: /media
+        hostPrefix: /mnt/storage/media/jellyfin
   qbittorrent:
     url: http://192.0.2.10:8080
     user: env:QBIT_USER

@@ -28,25 +28,25 @@ flowchart LR
 
 ## Capabilities Overview
 
-**136 tools across 15 toolsets**, **9 MCP resources**, and **8 workflow prompts** ([full generated reference](docs/tools.md) · [detailed feature catalog](docs/features.md)):
+**141 tools across 15 toolsets**, **9 MCP resources**, and **8 workflow prompts** ([full generated reference](docs/tools.md) · [detailed feature catalog](docs/features.md)):
 
-| Toolset       | Tools | Tiers      | Summary                                                                                                                                                        |
-| ------------- | ----- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`        | 6     | T0, T1     | Unified server overview, capabilities, async job status/cancel, audit logs                                                                                     |
-| `system`      | 13    | T0, T2, T3 | CPU/RAM/thermal/battery health, sysstat trends, SMART disks, journald logs, security audit, systemd control, passkey-gated reboot                              |
-| `docker`      | 12    | T0, T2     | Container inspection/logs/stats, update checks, **auto-rollback digest updates**, prune plans                                                                  |
-| `stacks`      | 11    | T0–T3      | Scan & validate Compose YAML against security policy, deploy curated templates, soft-trash removal                                                             |
-| `network`     | 14    | T0, T2, T3 | NPM proxy hosts, Cloudflare Tunnel ingress, DNS CNAMEs, exposure drift audit, reversible `expose_plan`/`expose_apply` & `unexpose_plan`/`unexpose_apply` sagas |
-| `backup`      | 6     | T0, T1, T3 | Restic S3/R2 freshness vs RPO, snapshot listing, manual runs, `restic check`, T3 staging-only restores                                                         |
-| `vaultwarden` | 8     | T0–T3      | Health & lockdown audit + **dedicated Vaultwarden backup status, snapshots, run, integrity test, prune plan/apply, & T3 staging restore**                      |
-| `apps`        | 1     | T0         | Configurable HTTP/HTTPS health probes across self-hosted apps                                                                                                  |
-| `music`       | 14    | T0, T1, T2 | Navidrome/Subsonic library search, stats, rescan, fuzzy track matcher, playlist CRUD                                                                           |
-| `naviload`    | 10    | T0, T1     | Search and download tracks/albums/batches via NaviLoad and sync Navidrome                                                                                      |
-| `media`       | 12    | T0, T1, T2 | Jellyfin libraries, sessions, search, scans, scheduled tasks, activity logs                                                                                    |
-| `downloads`   | 7     | T0, T1, T2 | Jackett torrent search/ranking, qBittorrent search/sort/inspect, categories, magnet/URL/result enqueue, pause/resume/recheck, plan-first removal               |
-| `alerts`      | 6     | T0, T1, T2 | Built-in metric/health rule watcher, ack/snooze, threshold tuning, `ntfy` + offline SQLite queue                                                               |
-| `files`       | 10    | T0, T1, T2 | Root-allowlisted file browse/read/write/move, `.env`/key denylist, soft-delete `.trash` (no `rm -rf`)                                                          |
-| `auth`        | 6     | T0, T2, T3 | OAuth client listing/revocation and **passkey-revealed Personal Access Tokens (PATs)**                                                                         |
+| Toolset       | Tools | Tiers      | Summary                                                                                                                                                              |
+| ------------- | ----- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`        | 6     | T0, T1     | Unified server overview, capabilities, async job status/cancel, audit logs                                                                                           |
+| `system`      | 13    | T0, T2, T3 | CPU/RAM/thermal/battery health, sysstat trends, SMART disks, journald logs, security audit, systemd control, passkey-gated reboot                                    |
+| `docker`      | 12    | T0, T2     | Container inspection/logs/stats, update checks, **auto-rollback digest updates**, prune plans                                                                        |
+| `stacks`      | 11    | T0–T3      | Scan & validate Compose YAML against security policy, deploy curated templates, soft-trash removal                                                                   |
+| `network`     | 14    | T0, T2, T3 | NPM proxy hosts, Cloudflare Tunnel ingress, DNS CNAMEs, exposure drift audit, reversible `expose_plan`/`expose_apply` & `unexpose_plan`/`unexpose_apply` sagas       |
+| `backup`      | 6     | T0, T1, T3 | Restic S3/R2 freshness vs RPO, snapshot listing, manual runs, `restic check`, T3 staging-only restores                                                               |
+| `vaultwarden` | 8     | T0–T3      | Health & lockdown audit + **dedicated Vaultwarden backup status, snapshots, run, integrity test, prune plan/apply, & T3 staging restore**                            |
+| `apps`        | 1     | T0         | Configurable HTTP/HTTPS health probes across self-hosted apps                                                                                                        |
+| `music`       | 14    | T0, T1, T2 | Navidrome/Subsonic library search, stats, rescan, fuzzy track matcher, playlist CRUD                                                                                 |
+| `naviload`    | 10    | T0, T1     | Search and download tracks/albums/batches via NaviLoad and sync Navidrome                                                                                            |
+| `media`       | 17    | T0, T1, T2 | Jellyfin libraries, sessions, search, problem finder, **Identify search/apply**, item inspect/metadata edit, single-item refresh, and qBittorrent-safe media renames |
+| `downloads`   | 7     | T0, T1, T2 | Jackett torrent search/ranking, qBittorrent search/sort/inspect, categories, magnet/URL/result enqueue, pause/resume/recheck, plan-first removal                     |
+| `alerts`      | 6     | T0, T1, T2 | Built-in metric/health rule watcher, ack/snooze, threshold tuning, `ntfy` + offline SQLite queue                                                                     |
+| `files`       | 10    | T0, T1, T2 | Root-allowlisted file browse/read/write/move, `.env`/key denylist, soft-delete `.trash` (no `rm -rf`)                                                                |
+| `auth`        | 6     | T0, T2, T3 | OAuth client listing/revocation and **passkey-revealed Personal Access Tokens (PATs)**                                                                               |
 
 ---
 

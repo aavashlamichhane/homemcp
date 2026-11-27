@@ -2,7 +2,7 @@
 
 > Auto-generated from `HomemcpRegistry` via `pnpm docs:generate`. Do not edit by hand.
 
-**Totals:** 136 tools across 15 toolsets, 9 resources, 8 prompts.
+**Totals:** 141 tools across 15 toolsets, 9 resources, 8 prompts.
 
 ## Toolsets Summary
 
@@ -16,7 +16,7 @@
 | `docker`      | 12    | T0, T2         |
 | `downloads`   | 7     | T0, T1, T2     |
 | `files`       | 10    | T0, T1, T2     |
-| `media`       | 12    | T0, T1, T2     |
+| `media`       | 17    | T0, T1, T2     |
 | `music`       | 14    | T0, T1, T2     |
 | `naviload`    | 10    | T0, T1         |
 | `network`     | 14    | T0, T2, T3     |
@@ -122,20 +122,25 @@
 
 ### `media`
 
-| Tool                       | Tier | Scope             | Hints (R/D/I/O) | Description                                                                                                                                                                   |
-| -------------------------- | ---- | ----------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jellyfin_activity_log`    | T0   | `homemcp:read`    | R/-/I/-         | Returns recent Jellyfin authentication and admin activity log entries. Read-only.                                                                                             |
-| `jellyfin_find_problems`   | T0   | `homemcp:read`    | R/-/I/-         | Scans Jellyfin library items for unidentified entries (missing ProviderIds), missing primary images, duplicate TMDB IDs, and non-standard Movie/Episode filenames. Read-only. |
-| `jellyfin_health`          | T0   | `homemcp:read`    | R/-/I/-         | Reports Jellyfin /health status, version, active playback/transcode count, hardware acceleration usage, failed scheduled tasks, and container health. Read-only.              |
-| `jellyfin_libraries`       | T0   | `homemcp:read`    | R/-/I/-         | Lists configured Jellyfin virtual folders and refresh states. Read-only.                                                                                                      |
-| `jellyfin_recently_added`  | T0   | `homemcp:read`    | R/-/I/-         | Lists recently added items in Jellyfin. Read-only.                                                                                                                            |
-| `jellyfin_run_task`        | T1   | `homemcp:operate` | -/-/I/-         | Triggers a Jellyfin scheduled task by ID or exact task name (e.g., Scan Media Library).                                                                                       |
-| `jellyfin_scheduled_tasks` | T0   | `homemcp:read`    | R/-/I/-         | Lists Jellyfin scheduled tasks and last execution results. Read-only.                                                                                                         |
-| `jellyfin_search`          | T0   | `homemcp:read`    | R/-/I/-         | Searches Jellyfin library items by title or media type. Read-only.                                                                                                            |
-| `jellyfin_sessions`        | T0   | `homemcp:read`    | R/-/I/-         | Lists active Jellyfin playback sessions including codec, hardware acceleration, and transcode reasons. Read-only.                                                             |
-| `jellyfin_users`           | T0   | `homemcp:read`    | R/-/I/-         | Lists configured Jellyfin user accounts and admin flags (redacted). Read-only.                                                                                                |
-| `media_rename_apply`       | T2   | `homemcp:admin`   | -/-/-/-         | Executes a confirmed media rename plan and triggers a Jellyfin library scan.                                                                                                  |
-| `media_rename_plan`        | T0   | `homemcp:read`    | R/-/I/-         | Plans renaming media files under allowed media roots to Jellyfin conventions (`Title (Year)` / `SxxExx`) before a library scan. Read-only.                                    |
+| Tool                            | Tier | Scope             | Hints (R/D/I/O) | Description                                                                                                                                                                                                                                                                               |
+| ------------------------------- | ---- | ----------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jellyfin_activity_log`         | T0   | `homemcp:read`    | R/-/I/-         | Returns recent Jellyfin authentication and admin activity log entries. Read-only.                                                                                                                                                                                                         |
+| `jellyfin_find_problems`        | T0   | `homemcp:read`    | R/-/I/-         | Scans Jellyfin library items (movies, series, episodes, boxsets, music, books) for unidentified entries (missing ProviderIds), missing primary images, duplicate TMDB IDs, and non-standard filenames. Read-only.                                                                         |
+| `jellyfin_health`               | T0   | `homemcp:read`    | R/-/I/-         | Reports Jellyfin /health status, version, active playback/transcode count, hardware acceleration usage, failed scheduled tasks, and container health. Read-only.                                                                                                                          |
+| `jellyfin_identify_apply`       | T1   | `homemcp:operate` | -/-/I/O         | Applies a chosen match_id from jellyfin_identify_search to a Jellyfin item (Movie, Series, BoxSet, MusicAlbum, MusicArtist, MusicVideo, Book, Person, Trailer) and refreshes its metadata/artwork without modifying files on disk.                                                        |
+| `jellyfin_identify_search`      | T0   | `homemcp:read`    | R/-/I/O         | Searches Jellyfin remote metadata providers (TMDB, TVDB, OMDB, Kitsu, AniDB, MusicBrainz, etc.) across Movie, Series, BoxSet, MusicAlbum, MusicArtist, MusicVideo, Book, Person, or Trailer, returning opaque match_id handles for jellyfin_identify_apply. Read-only.                    |
+| `jellyfin_item_inspect`         | T0   | `homemcp:read`    | R/-/I/-         | Inspects a single Jellyfin item (including ProviderIds, DisplayOrder, paths, lock state, and child seasons/episodes/tracks for containers) before Identify or metadata updates. Read-only.                                                                                                |
+| `jellyfin_item_update_metadata` | T1   | `homemcp:operate` | -/-/I/-         | Safely updates Jellyfin metadata fields (such as series DisplayOrder like aired/dvd/absolute, episode IndexNumber/ParentIndexNumber, ProviderIds, title/year, or LockData/LockedFields) by preserving the full existing item DTO.                                                         |
+| `jellyfin_libraries`            | T0   | `homemcp:read`    | R/-/I/-         | Lists configured Jellyfin virtual folders and refresh states. Read-only.                                                                                                                                                                                                                  |
+| `jellyfin_recently_added`       | T0   | `homemcp:read`    | R/-/I/-         | Lists recently added items in Jellyfin. Read-only.                                                                                                                                                                                                                                        |
+| `jellyfin_refresh_item`         | T1   | `homemcp:operate` | -/-/I/O         | Queues a metadata and/or image refresh for a single Jellyfin item without scanning the entire library.                                                                                                                                                                                    |
+| `jellyfin_run_task`             | T1   | `homemcp:operate` | -/-/I/-         | Triggers a Jellyfin scheduled task by ID or exact task name (e.g., Scan Media Library).                                                                                                                                                                                                   |
+| `jellyfin_scheduled_tasks`      | T0   | `homemcp:read`    | R/-/I/-         | Lists Jellyfin scheduled tasks and last execution results. Read-only.                                                                                                                                                                                                                     |
+| `jellyfin_search`               | T0   | `homemcp:read`    | R/-/I/-         | Searches Jellyfin library items by title or media type. Read-only.                                                                                                                                                                                                                        |
+| `jellyfin_sessions`             | T0   | `homemcp:read`    | R/-/I/-         | Lists active Jellyfin playback sessions including codec, hardware acceleration, and transcode reasons. Read-only.                                                                                                                                                                         |
+| `jellyfin_users`                | T0   | `homemcp:read`    | R/-/I/-         | Lists configured Jellyfin user accounts and admin flags (redacted). Read-only.                                                                                                                                                                                                            |
+| `media_rename_apply`            | T2   | `homemcp:admin`   | -/-/-/-         | Executes a confirmed media rename plan (using qBittorrent renameFile/renameFolder where matched to preserve seeding, and files.move otherwise) and triggers a Jellyfin library scan.                                                                                                      |
+| `media_rename_plan`             | T0   | `homemcp:read`    | R/-/I/-         | Plans renaming media files/folders under allowed media roots to Jellyfin conventions (`Title (Year)` / `SxxExx`). Automatically detects seeding qBittorrent torrents under save_path and routes those renames via qBittorrent renameFile/renameFolder so seeding stays intact. Read-only. |
 
 ### `music`
 

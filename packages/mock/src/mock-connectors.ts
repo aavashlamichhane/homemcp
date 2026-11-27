@@ -15,12 +15,19 @@ import {
   type JackettResolvedDownload,
   type JackettSearchResult,
   type JellyfinConnector,
+  type JellyfinItem,
+  type JellyfinMetadataPatch,
+  type JellyfinRefreshOptions,
+  type JellyfinRemoteSearchQuery,
+  type JellyfinRemoteSearchResult,
+  type JellyfinRemoteSearchType,
   type NaviloadConnector,
   type NpmConnector,
   type NpmProxyHost,
   type NtfyConnector,
   type NtfyMessage,
   type QbittorrentConnector,
+  type QbitTorrentFile,
   type RegistryConnector,
   type SubsonicConnector,
   type SubsonicPlaylist,
@@ -716,6 +723,7 @@ export class MockJellyfinConnector implements JellyfinConnector {
   public searchItems(opts: {
     searchTerm?: string | undefined;
     includeItemTypes?: string | undefined;
+    parentId?: string | undefined;
     limit?: number | undefined;
   }) {
     const q = (opts.searchTerm ?? '').toLowerCase();
@@ -723,12 +731,141 @@ export class MockJellyfinConnector implements JellyfinConnector {
       if (q && !item.Name.toLowerCase().includes(q)) return false;
       if (opts.includeItemTypes && !opts.includeItemTypes.split(',').includes(item.Type))
         return false;
+      if (opts.parentId && item.SeriesId !== opts.parentId && item.SeasonId !== opts.parentId) {
+        return false;
+      }
       return true;
     });
     return Promise.resolve({
       Items: filtered.slice(0, opts.limit ?? 50),
       TotalRecordCount: filtered.length,
     });
+  }
+
+  public getItem(itemId: string): Promise<JellyfinItem & Record<string, unknown>> {
+    const item = this.state.jellyfinItems.find((i) => i.Id === itemId);
+    if (!item) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `Jellyfin item not found: ${itemId}`));
+    }
+    return Promise.resolve({ ...item } as JellyfinItem & Record<string, unknown>);
+  }
+
+  public getItemChildren(
+    parentId: string,
+    opts?: {
+      includeItemTypes?: string | undefined;
+      recursive?: boolean | undefined;
+      limit?: number | undefined;
+    },
+  ) {
+    const parent = this.state.jellyfinItems.find((i) => i.Id === parentId);
+    if (!parent) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `Jellyfin item not found: ${parentId}`));
+    }
+    const allowedTypes = opts?.includeItemTypes ? new Set(opts.includeItemTypes.split(',')) : null;
+    const children = this.state.jellyfinItems.filter((item) => {
+      if (item.Id === parentId) return false;
+      const isChild =
+        item.SeriesId === parentId ||
+        item.SeasonId === parentId ||
+        Boolean(parent.Path && item.Path?.startsWith(`${parent.Path}/`));
+      if (!isChild) return false;
+      if (allowedTypes && !allowedTypes.has(item.Type)) return false;
+      return true;
+    });
+    return Promise.resolve({
+      Items: children.slice(0, opts?.limit ?? 100),
+      TotalRecordCount: children.length,
+    });
+  }
+
+  public remoteSearch(
+    itemType: JellyfinRemoteSearchType,
+    query: JellyfinRemoteSearchQuery,
+  ): Promise<JellyfinRemoteSearchResult[]> {
+    const title = query.name ?? 'Resolved Title';
+    const year = query.year ?? 2024;
+    if (itemType === 'Series') {
+      return Promise.resolve([
+        {
+          Name: title.replace(/^\[[^\]]+\]\s*/, ''),
+          ProductionYear: year,
+          SearchProviderName: query.searchProviderName ?? 'TheMovieDb',
+          ProviderIds: query.providerIds ?? { Tmdb: '99001', Tvdb: '44001' },
+          Overview: 'Matched television/anime series entry from metadata provider.',
+          ImageUrl: 'https://image.tmdb.org/t/p/original/mock-series.jpg',
+        },
+        {
+          Name: `${title.replace(/^\[[^\]]+\]\s*/, '')} (OVA)`,
+          ProductionYear: year + 1,
+          SearchProviderName: 'Kitsu',
+          ProviderIds: { Kitsu: '88001' },
+          Overview: 'Alternate OVA metadata candidate.',
+        },
+      ]);
+    }
+    return Promise.resolve([
+      {
+        Name: title,
+        ProductionYear: year,
+        SearchProviderName: query.searchProviderName ?? 'TheMovieDb',
+        ProviderIds: query.providerIds ?? { Tmdb: '55001', Imdb: 'tt0055001' },
+        Overview: `Matched ${itemType} candidate from metadata provider.`,
+        ImageUrl: 'https://image.tmdb.org/t/p/original/mock-item.jpg',
+      },
+    ]);
+  }
+
+  public applyRemoteSearchResult(
+    itemId: string,
+    result: JellyfinRemoteSearchResult,
+    _replaceAllImages = true,
+  ): Promise<void> {
+    const item = this.state.jellyfinItems.find((i) => i.Id === itemId);
+    if (!item) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `Jellyfin item not found: ${itemId}`));
+    }
+    if (result.Name) item.Name = result.Name;
+    if (result.ProductionYear !== undefined) item.ProductionYear = result.ProductionYear;
+    if (result.ProviderIds)
+      item.ProviderIds = { ...(item.ProviderIds ?? {}), ...result.ProviderIds };
+    if (result.Overview) item.Overview = result.Overview;
+    item.ImageTags = { ...(item.ImageTags ?? {}), Primary: 'applied-tag-1' };
+    return Promise.resolve();
+  }
+
+  public refreshItem(itemId: string, _opts?: JellyfinRefreshOptions): Promise<void> {
+    const item = this.state.jellyfinItems.find((i) => i.Id === itemId);
+    if (!item) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `Jellyfin item not found: ${itemId}`));
+    }
+    return Promise.resolve();
+  }
+
+  public updateItemMetadata(itemId: string, patch: JellyfinMetadataPatch): Promise<void> {
+    const item = this.state.jellyfinItems.find((i) => i.Id === itemId);
+    if (!item) {
+      return Promise.reject(new HomemcpError('NOT_FOUND', `Jellyfin item not found: ${itemId}`));
+    }
+    if (patch.name !== undefined) item.Name = patch.name;
+    if (patch.originalTitle !== undefined) item.OriginalTitle = patch.originalTitle;
+    if (patch.productionYear !== undefined) item.ProductionYear = patch.productionYear;
+    if (patch.overview !== undefined) item.Overview = patch.overview;
+    if (patch.displayOrder !== undefined) item.DisplayOrder = patch.displayOrder;
+    if (patch.indexNumber !== undefined) item.IndexNumber = patch.indexNumber;
+    if (patch.indexNumberEnd !== undefined) item.IndexNumberEnd = patch.indexNumberEnd;
+    if (patch.parentIndexNumber !== undefined) item.ParentIndexNumber = patch.parentIndexNumber;
+    if (patch.lockData !== undefined) item.LockData = patch.lockData;
+    if (patch.lockedFields !== undefined) item.LockedFields = [...patch.lockedFields];
+    if (patch.providerIds !== undefined) {
+      const merged: Record<string, string> = { ...(item.ProviderIds ?? {}) };
+      for (const [k, v] of Object.entries(patch.providerIds)) {
+        if (v === '') delete merged[k];
+        else merged[k] = v;
+      }
+      item.ProviderIds = merged;
+    }
+    return Promise.resolve();
   }
 
   public getScheduledTasks() {
@@ -758,7 +895,31 @@ export class MockJellyfinConnector implements JellyfinConnector {
 }
 
 export class MockQbittorrentConnector implements QbittorrentConnector {
+  private readonly torrentFiles = new Map<string, QbitTorrentFile[]>();
+
   public constructor(private readonly state: MockState) {}
+
+  private ensureFiles(hash: string): QbitTorrentFile[] {
+    const existing = this.torrentFiles.get(hash);
+    if (existing) return existing;
+    const found = this.state.qbitTorrents.find((t) => t.hash === hash);
+    if (!found) return [];
+    const defaultName =
+      hash === '11223344556677889900aabbccddeeff00112233'
+        ? `${found.name}/ep01.mkv`
+        : `${found.name}/${found.name}.mkv`;
+    const initialized: QbitTorrentFile[] = [
+      {
+        index: 0,
+        name: defaultName,
+        size: found.size,
+        progress: found.progress,
+        priority: 1,
+      },
+    ];
+    this.torrentFiles.set(hash, initialized);
+    return initialized;
+  }
 
   public getTransferInfo() {
     return Promise.resolve({
@@ -781,17 +942,7 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
   }
 
   public getTorrentFiles(hash: string) {
-    const found = this.state.qbitTorrents.find((t) => t.hash === hash);
-    if (!found) return Promise.resolve([]);
-    return Promise.resolve([
-      {
-        index: 0,
-        name: `${found.name}/${found.name}.mkv`,
-        size: found.size,
-        progress: found.progress,
-        priority: 1,
-      },
-    ]);
+    return Promise.resolve(this.ensureFiles(hash).map((f) => ({ ...f })));
   }
 
   public getTorrentTrackers(hash: string) {
@@ -859,6 +1010,42 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
       if (hashes.includes(t.hash)) {
         t.state =
           action === 'pause' ? 'pausedDL' : action === 'resume' ? 'downloading' : 'checkingDL';
+      }
+    }
+    return Promise.resolve();
+  }
+
+  public renameFile(hash: string, oldPath: string, newPath: string): Promise<void> {
+    const files = this.ensureFiles(hash);
+    const target = files.find((f) => f.name === oldPath);
+    if (!target) {
+      return Promise.reject(new HomemcpError('CONFLICT', `Torrent file not found: ${oldPath}`));
+    }
+    if (files.some((f) => f.name === newPath)) {
+      return Promise.reject(new HomemcpError('CONFLICT', `Target file already exists: ${newPath}`));
+    }
+    target.name = newPath;
+    return Promise.resolve();
+  }
+
+  public renameFolder(hash: string, oldPath: string, newPath: string): Promise<void> {
+    const files = this.ensureFiles(hash);
+    const prefix = `${oldPath.replace(/\/+$/, '')}/`;
+    const matched = files.filter((f) => f.name.startsWith(prefix));
+    if (matched.length === 0) {
+      return Promise.reject(new HomemcpError('CONFLICT', `Torrent folder not found: ${oldPath}`));
+    }
+    const cleanNew = newPath.replace(/\/+$/, '');
+    for (const f of matched) {
+      f.name = `${cleanNew}/${f.name.slice(prefix.length)}`;
+    }
+    return Promise.resolve();
+  }
+
+  public setLocation(hashes: readonly string[], location: string): Promise<void> {
+    for (const t of this.state.qbitTorrents) {
+      if (hashes.includes(t.hash)) {
+        t.save_path = location;
       }
     }
     return Promise.resolve();

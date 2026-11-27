@@ -62,6 +62,9 @@ export interface QbittorrentConnector {
     savepath?: string | undefined;
   }): Promise<void>;
   controlTorrents(action: 'pause' | 'resume' | 'recheck', hashes: readonly string[]): Promise<void>;
+  renameFile(hash: string, oldPath: string, newPath: string): Promise<void>;
+  renameFolder(hash: string, oldPath: string, newPath: string): Promise<void>;
+  setLocation(hashes: readonly string[], location: string): Promise<void>;
   deleteTorrents(hashes: readonly string[], deleteFiles: boolean): Promise<void>;
 }
 
@@ -119,6 +122,20 @@ export class HttpQbittorrentConnector implements QbittorrentConnector {
     }
     if (resp.status === 401 || resp.status === 403) {
       throw new HomemcpError('UPSTREAM_AUTH', `qBittorrent returned ${resp.status}`);
+    }
+    if (resp.status === 400) {
+      const text = await resp.text().catch(() => '');
+      throw new HomemcpError(
+        'INVALID_ARGUMENT',
+        `qBittorrent HTTP 400${text ? `: ${text.slice(0, 200)}` : ''}`,
+      );
+    }
+    if (resp.status === 409) {
+      const text = await resp.text().catch(() => '');
+      throw new HomemcpError(
+        'CONFLICT',
+        `qBittorrent HTTP 409${text ? `: ${text.slice(0, 200)}` : ''}`,
+      );
     }
     if (!resp.ok) {
       throw new HomemcpError('UPSTREAM_UNAVAILABLE', `qBittorrent HTTP ${resp.status}`);
@@ -227,6 +244,30 @@ export class HttpQbittorrentConnector implements QbittorrentConnector {
       }
       throw err;
     }
+  }
+
+  public async renameFile(hash: string, oldPath: string, newPath: string): Promise<void> {
+    await this.withAuth('/api/v2/torrents/renameFile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ hash, oldPath, newPath }).toString(),
+    });
+  }
+
+  public async renameFolder(hash: string, oldPath: string, newPath: string): Promise<void> {
+    await this.withAuth('/api/v2/torrents/renameFolder', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ hash, oldPath, newPath }).toString(),
+    });
+  }
+
+  public async setLocation(hashes: readonly string[], location: string): Promise<void> {
+    await this.withAuth('/api/v2/torrents/setLocation', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ hashes: hashes.join('|'), location }).toString(),
+    });
   }
 
   public async deleteTorrents(hashes: readonly string[], deleteFiles: boolean): Promise<void> {
