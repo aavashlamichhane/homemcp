@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HomemcpError } from '../src/errors.js';
-import { buildToolResult, truncateText } from '../src/output.js';
+import { buildToolResult, MAX_TEXT_OUTPUT_BYTES, truncateText } from '../src/output.js';
 import { hasRequiredScope, parseToolsetFilter } from '../src/tiers.js';
 import { formatUntrustedText, wrapUntrusted } from '../src/untrusted.js';
 
@@ -39,7 +39,22 @@ describe('errors, tiers, untrusted, output', () => {
     expect(trunc.truncated).toBe(true);
     expect(Buffer.byteLength(trunc.text, 'utf8')).toBeLessThanOrEqual(1024);
 
-    const toolRes = buildToolResult('ok', { count: 1 });
-    expect(toolRes.structuredContent).toEqual({ count: 1 });
+    const toolRes = buildToolResult('Found 2 items', {
+      items: [{ id: 'a', name: 'Test' }],
+    });
+    expect(toolRes.structuredContent).toEqual({ items: [{ id: 'a', name: 'Test' }] });
+    expect(toolRes.content[0]?.text).toContain('Found 2 items');
+    expect(toolRes.content[0]?.text).toContain('"name":"Test"');
+
+    const hugePayload = {
+      items: Array.from({ length: 2000 }, (_, i) => `item-${i}-${'x'.repeat(50)}`),
+    };
+    const truncRes = buildToolResult('Huge list', hugePayload);
+    expect(truncRes.content[0]?.text).toContain('Huge list');
+    expect(truncRes.content[0]?.text).toContain('... [truncated]');
+    expect(Buffer.byteLength(truncRes.content[0]?.text ?? '', 'utf8')).toBeLessThanOrEqual(
+      MAX_TEXT_OUTPUT_BYTES,
+    );
+    expect('truncated' in truncRes.structuredContent).toBe(false);
   });
 });

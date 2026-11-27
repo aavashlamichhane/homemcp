@@ -47,7 +47,11 @@ function createClient(transport: InMemoryTransport) {
     callTool: async (name: string, args: Record<string, unknown> = {}) => {
       const res = await call('tools/call', { name, arguments: args });
       expect(res['error']).toBeUndefined();
-      return res['result'] as { isError?: boolean; structuredContent: Record<string, unknown> };
+      return res['result'] as {
+        isError?: boolean;
+        content: Array<{ type: string; text: string }>;
+        structuredContent: Record<string, unknown>;
+      };
     },
   };
 }
@@ -89,6 +93,10 @@ describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
     expect(jfHealth.structuredContent['active_transcodes']).toBe(1);
 
     const jfProblems = await client.callTool('jellyfin_find_problems', { limit: 50 });
+    expect(jfProblems.content[0]?.text).toContain('[Fansub] Sample Anime S1');
+    expect(jfProblems.content[0]?.text).toContain(
+      '/mnt/storage/media/jellyfin/series/[Fansub] Sample Anime S1',
+    );
     const unidentifiedList = jfProblems.structuredContent['unidentified'] as Array<
       Record<string, unknown>
     >;
@@ -97,6 +105,11 @@ describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
     expect(
       (jfProblems.structuredContent['naming_issues'] as unknown[]).length,
     ).toBeGreaterThanOrEqual(1);
+
+    // Ensure registry redactor also scrubs secrets serialized into content[0].text
+    const jfSearch = await client.callTool('jellyfin_search', { query: 'Sample' });
+    expect(jfSearch.content[0]?.text).toContain('Sample Sci-Fi Movie');
+    expect(jfSearch.content[0]?.text).not.toContain('mock-qbit-password');
 
     // Jellyfin item inspect, Identify search/apply, metadata edit, and refresh
     const seriesInspect = await client.callTool('jellyfin_item_inspect', { item_id: 'jf-s1' });

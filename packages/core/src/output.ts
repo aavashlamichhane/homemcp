@@ -25,10 +25,11 @@ export function buildToolResult<T extends Record<string, unknown>>(
   content: Array<{ type: 'text'; text: string }>;
   structuredContent: T;
 } {
-  const { text, truncated } = truncateText(summary);
-  const outStructured = truncated ? { ...structured, truncated: true } : structured;
+  const hasStructured = Object.keys(structured).length > 0;
+  const combined = hasStructured ? `${summary}\n\n${JSON.stringify(structured)}` : summary;
+  const { text } = truncateText(combined, MAX_TEXT_OUTPUT_BYTES);
   return {
     content: [{ type: 'text', text }],
-    structuredContent: outStructured,
+    structuredContent: structured,
   };
 }
