@@ -114,6 +114,19 @@ async function runDoctor(args: CliArgs): Promise<number> {
     }
   }
 
+  if (deps.jackett) {
+    try {
+      const idx = await deps.jackett.listIndexers();
+      checks.push({ name: 'jackett', ok: true, detail: `${idx.length} configured indexers` });
+    } catch (err) {
+      checks.push({
+        name: 'jackett',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   for (const c of checks) {
     const safeDetail = redactor.redactString(c.detail).text;
     process.stdout.write(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}: ${safeDetail}\n`);

@@ -184,13 +184,21 @@ export class Redactor {
       return `${p1}${marker('cookie', val)}`;
     });
 
-    // Layer 3d: URLs with embedded user:pass@host
+    // Layer 3d: URLs with embedded user:pass@host and URL query API keys
     text = text.replace(
       /\b([a-z][a-z0-9+.-]*:\/\/)([^:\s/@]+):([^@\s/]+)@/gi,
       (_m, scheme: string, user: string, pass: string) => {
         if (SAFE_EXACT_PLACEHOLDER_RE.test(pass)) return `${scheme}${user}:${pass}@`;
         count++;
         return `${scheme}${user}:${marker('url_auth', `${user}:${pass}`)}@`;
+      },
+    );
+    text = text.replace(
+      /([?&](?:jackett_)?apikey=)([^&\s"'<>]+)/gi,
+      (_m, prefix: string, tok: string) => {
+        if (SAFE_EXACT_PLACEHOLDER_RE.test(tok)) return `${prefix}${tok}`;
+        count++;
+        return `${prefix}${marker('query_key', tok)}`;
       },
     );
 

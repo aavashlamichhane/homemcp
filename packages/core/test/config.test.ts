@@ -29,6 +29,7 @@ describe('config loader', () => {
       JELLYFIN_API_KEY: 'test-jellyfin-key-0007',
       QBIT_USER: 'admin',
       QBIT_PASSWORD: 'test-qbit-pass-0008',
+      JACKETT_API_KEY: 'test-jackett-key-0009',
       NTFY_URL: 'https://ntfy.sh/test-private-topic-9999',
       NTFY_TOKEN: 'tk_testntfytoken000000000001',
       HC_URL_HOMEMCP: 'https://hc-ping.com/11111111-1111-1111-1111-111111111111',

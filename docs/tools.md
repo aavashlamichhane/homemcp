@@ -2,7 +2,7 @@
 
 > Auto-generated from `HomemcpRegistry` via `pnpm docs:generate`. Do not edit by hand.
 
-**Totals:** 134 tools across 15 toolsets, 9 resources, 8 prompts.
+**Totals:** 136 tools across 15 toolsets, 9 resources, 8 prompts.
 
 ## Toolsets Summary
 
@@ -14,7 +14,7 @@
 | `backup`      | 6     | T0, T1, T3     |
 | `core`        | 6     | T0, T1         |
 | `docker`      | 12    | T0, T2         |
-| `downloads`   | 5     | T0, T1, T2     |
+| `downloads`   | 7     | T0, T1, T2     |
 | `files`       | 10    | T0, T1, T2     |
 | `media`       | 12    | T0, T1, T2     |
 | `music`       | 14    | T0, T1, T2     |
@@ -95,13 +95,15 @@
 
 ### `downloads`
 
-| Tool                | Tier | Scope             | Hints (R/D/I/O) | Description                                                                                                                                                                        |
-| ------------------- | ---- | ----------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `downloads_add`     | T1   | `homemcp:operate` | -/-/-/O         | Adds a magnet link or torrent URL to qBittorrent under a configured category (e.g., movies, series, anime) after verifying target filesystem free space is above safety threshold. |
-| `downloads_control` | T1   | `homemcp:operate` | -/-/I/-         | Pauses, resumes, or forces recheck on one or more torrents by infohash.                                                                                                            |
-| `downloads_inspect` | T0   | `homemcp:read`    | R/-/I/-         | Inspects a specific torrent by infohash or name query, returning completion timestamp, save path, files, and sanitized tracker states. Read-only.                                  |
-| `downloads_remove`  | T2   | `homemcp:admin`   | -/D/-/-         | Removes torrents from qBittorrent (plan-first; deleting downloaded files requires T3 passkey confirmation).                                                                        |
-| `downloads_status`  | T0   | `homemcp:read`    | R/-/I/-         | Searches, filters, sorts, and lists qBittorrent torrents along with transfer speeds and configured categories. Read-only.                                                          |
+| Tool                 | Tier | Scope             | Hints (R/D/I/O) | Description                                                                                                                                                                                                                                                  |
+| -------------------- | ---- | ----------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `downloads_add`      | T1   | `homemcp:operate` | -/-/-/O         | Adds a magnet link, torrent URL, or Jackett search result_id to qBittorrent under a configured category (e.g., movies, series, anime) after verifying target filesystem free space is above safety threshold.                                                |
+| `downloads_control`  | T1   | `homemcp:operate` | -/-/I/-         | Pauses, resumes, or forces recheck on one or more torrents by infohash.                                                                                                                                                                                      |
+| `downloads_indexers` | T0   | `homemcp:read`    | R/-/I/-         | Lists configured Jackett torrent indexers and their supported category IDs. Read-only.                                                                                                                                                                       |
+| `downloads_inspect`  | T0   | `homemcp:read`    | R/-/I/-         | Inspects a specific torrent by infohash or name query, returning completion timestamp, save path, files, and sanitized tracker states. Read-only.                                                                                                            |
+| `downloads_remove`   | T2   | `homemcp:admin`   | -/D/-/-         | Removes torrents from qBittorrent (plan-first; deleting downloaded files requires T3 passkey confirmation).                                                                                                                                                  |
+| `downloads_search`   | T0   | `homemcp:read`    | R/-/I/O         | Searches configured Jackett indexers in parallel (waiting up to wait_seconds for slower indexers), ranks results by seeders/size/recency, and returns opaque result_id handles for user-approved downloads_add without exposing indexer API keys. Read-only. |
+| `downloads_status`   | T0   | `homemcp:read`    | R/-/I/-         | Searches, filters, sorts, and lists qBittorrent torrents along with transfer speeds and configured categories. Read-only.                                                                                                                                    |
 
 ### `files`
 

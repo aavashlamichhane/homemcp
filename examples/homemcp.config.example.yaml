@@ -127,6 +127,11 @@ modules:
       movies: /mnt/storage/media/jellyfin/movies
       series: /mnt/storage/media/jellyfin/series
       anime: /mnt/storage/media/jellyfin/anime
+  jackett:
+    url: http://192.0.2.10:9117
+    apiKey: env:JACKETT_API_KEY
+    defaultTimeoutSeconds: 55
+    excludeIndexers: []
   alerts:
     ntfy:
       url: env:NTFY_URL

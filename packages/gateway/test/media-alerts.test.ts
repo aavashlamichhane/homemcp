@@ -136,6 +136,40 @@ describe('Phase 4 Media, Downloads, Backup Actions, and AlertWatcher', () => {
       ((dlInspect.structuredContent['trackers'] as Array<Record<string, unknown>>)[0] ?? {})['url'],
     ).toBe('https://tracker.example.org/announce');
 
+    // Jackett indexers, ranked search (sorted by seeders desc), and result_id handoff without leaking download_link/apikey
+    const idxList = await client.callTool('downloads_indexers');
+    expect((idxList.structuredContent['indexers'] as unknown[]).length).toBe(2);
+
+    const searchRes = await client.callTool('downloads_search', {
+      query: 'Big Buck Bunny',
+      category: 'movies',
+      wait_seconds: 10,
+    });
+    expect(searchRes.structuredContent['untrusted_source']).toBe('jackett-indexers');
+    const hits = searchRes.structuredContent['results'] as Array<Record<string, unknown>>;
+    expect(hits).toHaveLength(2);
+    expect(hits[0]?.['seeders']).toBe(185);
+    expect(hits[0]?.['indexer_id']).toBe('indexer-slow');
+    expect(JSON.stringify(searchRes)).not.toContain('jackett_apikey');
+    expect(JSON.stringify(searchRes)).not.toContain('download_link');
+
+    const slowId = String(hits[0]?.['result_id']);
+    const fastId = String(hits[1]?.['result_id']);
+    const addSlow = await client.callTool('downloads_add', {
+      result_id: slowId,
+      category: 'movies',
+      min_free_bytes: 1_000_000,
+    });
+    expect(addSlow.structuredContent['added']).toBe(true);
+    expect(addSlow.structuredContent['indexer']).toBe('Slow Indexer');
+
+    const addFast = await client.callTool('downloads_add', {
+      result_id: fastId,
+      category: 'movies',
+      min_free_bytes: 1_000_000,
+    });
+    expect(addFast.structuredContent['added']).toBe(true);
+
     await ct.close();
     await st.close();
   });

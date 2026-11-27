@@ -3,6 +3,7 @@ import {
   HttpCloudflareConnector,
   HttpDockerConnector,
   HttpHealthchecksConnector,
+  HttpJackettConnector,
   HttpJellyfinConnector,
   HttpNaviloadConnector,
   HttpNpmConnector,
@@ -18,6 +19,7 @@ import {
   type DockerConnector,
   type HealthchecksConnector,
   type HttpProbeConnector,
+  type JackettConnector,
   type JellyfinConnector,
   type NaviloadConnector,
   type NpmConnector,
@@ -43,6 +45,7 @@ import {
   MockExecutor,
   MockHealthchecksConnector,
   MockHttpProbeConnector,
+  MockJackettConnector,
   MockJellyfinConnector,
   MockNaviloadConnector,
   MockNpmConnector,
@@ -99,6 +102,7 @@ export interface GatewayDeps {
   naviload?: NaviloadConnector | undefined;
   jellyfin?: JellyfinConnector | undefined;
   qbittorrent?: QbittorrentConnector | undefined;
+  jackett?: JackettConnector | undefined;
   ntfy?: NtfyConnector | undefined;
   healthchecks?: HealthchecksConnector | undefined;
   httpProbe: HttpProbeConnector;
@@ -217,6 +221,7 @@ export function createGatewayDeps(opts: {
     config.modules.naviload?.token,
     config.modules.jellyfin?.apiKey,
     config.modules.qbittorrent?.password,
+    config.modules.jackett?.apiKey,
     config.modules.alerts?.ntfy?.token,
     config.modules.alerts?.ntfy?.url,
     config.modules.alerts?.healthchecks?.pingUrl,
@@ -243,6 +248,7 @@ export function createGatewayDeps(opts: {
   let naviload: NaviloadConnector | undefined;
   let jellyfin: JellyfinConnector | undefined;
   let qbittorrent: QbittorrentConnector | undefined;
+  let jackett: JackettConnector | undefined;
   let ntfy: NtfyConnector | undefined;
   let healthchecks: HealthchecksConnector | undefined;
   let httpProbe: HttpProbeConnector;
@@ -259,6 +265,7 @@ export function createGatewayDeps(opts: {
     naviload = new MockNaviloadConnector(state);
     jellyfin = new MockJellyfinConnector(state);
     qbittorrent = new MockQbittorrentConnector(state);
+    jackett = new MockJackettConnector();
     ntfy = new MockNtfyConnector(state);
     healthchecks = new MockHealthchecksConnector(state);
     httpProbe = new MockHttpProbeConnector();
@@ -293,6 +300,7 @@ export function createGatewayDeps(opts: {
     qbittorrent = config.modules.qbittorrent
       ? new HttpQbittorrentConnector(config.modules.qbittorrent)
       : undefined;
+    jackett = config.modules.jackett ? new HttpJackettConnector(config.modules.jackett) : undefined;
     ntfy = config.modules.alerts?.ntfy?.url
       ? new HttpNtfyConnector({
           url: config.modules.alerts.ntfy.url,
@@ -337,6 +345,7 @@ export function createGatewayDeps(opts: {
     naviload,
     jellyfin,
     qbittorrent,
+    jackett,
     ntfy,
     healthchecks,
     httpProbe,

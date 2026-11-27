@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { HttpHealthchecksConnector } from '../src/healthchecks.js';
+import { HttpJackettConnector } from '../src/jackett.js';
 import { HttpJellyfinConnector } from '../src/jellyfin.js';
 import { HttpNtfyConnector } from '../src/ntfy.js';
 import { HttpQbittorrentConnector } from '../src/qbittorrent.js';
@@ -139,13 +140,108 @@ describe('Phase 4 connectors (Jellyfin, qBittorrent, ntfy, healthchecks)', () =>
     await qb.controlTorrents('resume', ['0123456789']);
     const files = await qb.getTorrentFiles('0123456789');
     const trackers = await qb.getTorrentTrackers('0123456789');
+    await qb.addTorrentFile({
+      filename: 'sample.torrent',
+      data: new Uint8Array([1, 2, 3]),
+      category: 'movies',
+    });
     expect(loginCount).toBe(1);
     expect(files).toHaveLength(1);
     expect(trackers).toHaveLength(1);
-    expect(seenPaths).toContain('/api/v2/torrents/add');
+    expect(seenPaths.filter((p) => p === '/api/v2/torrents/add')).toHaveLength(2);
     expect(seenPaths).toContain('/api/v2/torrents/stop');
     expect(seenPaths).toContain('/api/v2/torrents/start');
     expect(seenPaths).toContain('/api/v2/torrents/resume');
+  });
+
+  it('HttpJackettConnector lists indexers, merges parallel fast+timeout search, and safely resolves downloads', async () => {
+    const secretKey = 'jackett-fixture-key-9999';
+    const url = await startMockServer((req, res) => {
+      const parsed = new URL(req.url ?? '/', 'http://127.0.0.1');
+      if (parsed.pathname === '/api/v2.0/indexers/all/results/torznab/api') {
+        expect(parsed.searchParams.get('apikey')).toBe(secretKey);
+        res.writeHead(200, { 'content-type': 'application/xml' });
+        res.end(
+          `<?xml version="1.0" encoding="UTF-8"?>
+          <indexers>
+            <indexer id="idx-fast" configured="true"><title>FastIdx</title><caps><categories><category id="2000" name="Movies"/></categories></caps></indexer>
+            <indexer id="idx-slow" configured="true"><title>SlowIdx</title><caps><categories><category id="2000" name="Movies"/></categories></caps></indexer>
+          </indexers>`,
+        );
+        return;
+      }
+      if (parsed.pathname === '/api/v2.0/indexers/idx-fast/results') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            Indexers: [{ ID: 'idx-fast', Name: 'FastIdx', Status: 2, Results: 1, ElapsedTime: 25 }],
+            Results: [
+              {
+                Title: 'Sample Release 1080p',
+                Tracker: 'FastIdx',
+                TrackerId: 'idx-fast',
+                Size: 2_000_000_000,
+                Seeders: 50,
+                Peers: 4,
+                CategoryDesc: 'Movies/HD',
+                PublishDate: '2026-11-20T00:00:00Z',
+                InfoHash: 'aaaa1111bbbb2222cccc3333dddd4444eeee5555',
+                MagnetUri: null,
+                Link: `${url}/dl/idx-fast/?jackett_apikey=${secretKey}&file=sample`,
+              },
+            ],
+          }),
+        );
+        return;
+      }
+      if (parsed.pathname === '/api/v2.0/indexers/idx-slow/results') {
+        // Deliberately stall past test timeoutMs
+        setTimeout(() => {
+          if (!res.writableEnded) {
+            res.writeHead(200);
+            res.end('{}');
+          }
+        }, 2_500);
+        return;
+      }
+      if (parsed.pathname === '/dl/idx-fast/magnet') {
+        res.writeHead(302, { location: 'magnet:?xt=urn:btih:aaaa1111' });
+        res.end();
+        return;
+      }
+      if (parsed.pathname === '/dl/idx-fast/') {
+        res.writeHead(200, {
+          'content-type': 'application/x-bittorrent',
+          'content-disposition': 'attachment; filename="sample.torrent"',
+        });
+        res.end(Buffer.from('d8:announcee'));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+
+    const jkt = new HttpJackettConnector({ url, apiKey: secretKey, defaultTimeoutSeconds: 5 });
+    const indexers = await jkt.listIndexers();
+    expect(indexers.map((i) => i.id)).toEqual(['idx-fast', 'idx-slow']);
+
+    const searchRes = await jkt.search({ query: 'Sample', timeoutMs: 1_000 });
+    expect(searchRes.results).toHaveLength(1);
+    expect(searchRes.results[0]?.seeders).toBe(50);
+    expect(searchRes.indexers.find((i) => i.id === 'idx-fast')?.status).toBe('ok');
+    const slowStat = searchRes.indexers.find((i) => i.id === 'idx-slow');
+    expect(slowStat?.status).toBe('timeout');
+    expect(slowStat?.error).not.toContain(secretKey);
+
+    const torrentRes = await jkt.resolveDownload(`${url}/dl/idx-fast/?jackett_apikey=${secretKey}`);
+    expect(torrentRes).toMatchObject({ kind: 'torrent', filename: 'sample.torrent' });
+
+    const magnetRes = await jkt.resolveDownload(`${url}/dl/idx-fast/magnet`);
+    expect(magnetRes).toEqual({ kind: 'magnet', magnetUri: 'magnet:?xt=urn:btih:aaaa1111' });
+
+    await expect(jkt.resolveDownload('http://198.51.100.10:9117/evil')).rejects.toMatchObject({
+      code: 'POLICY_DENIED',
+    });
   });
 
   it('HttpNtfyConnector and HttpHealthchecksConnector send notifications and pings', async () => {

@@ -61,6 +61,8 @@ describe('Redactor', () => {
       'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJvd25lciJ9.signaturepart123',
       'Cookie: session=abc123def456; csrf=xyz',
       'postgres://admin:verysecretpass@db.example.com:5432/app',
+      'http://192.0.2.10:9117/dl/test/?jackett_apikey=fakekey1234567890&file=foo',
+      'http://192.0.2.10:9117/api/v2.0/indexers/all/results?apikey=fakekey1234567890',
       'ghp_1234567890abcdef1234567890abcdef1234',
       'cfut_fake0123456789abcdefghij0123456789',
       'cfat_fake0123456789abcdefghij0123456789',

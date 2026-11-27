@@ -9,6 +9,11 @@ import {
   type HealthchecksConnector,
   type HttpProbeConnector,
   type HttpProbeResult,
+  type JackettConnector,
+  type JackettIndexer,
+  type JackettIndexerRunStat,
+  type JackettResolvedDownload,
+  type JackettSearchResult,
   type JellyfinConnector,
   type NaviloadConnector,
   type NpmConnector,
@@ -826,6 +831,29 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
     return Promise.resolve();
   }
 
+  public addTorrentFile(opts: {
+    filename: string;
+    data: Uint8Array;
+    category?: string | undefined;
+    savepath?: string | undefined;
+  }) {
+    const hash = `mock${(this.state.qbitTorrents.length + 1).toString(16).padStart(36, '0')}`;
+    this.state.qbitTorrents.push({
+      hash,
+      name: opts.filename.replace(/\.torrent$/i, '') || 'Torrent File Download',
+      size: Math.max(opts.data.byteLength, 1_500_000_000),
+      progress: 0,
+      dlspeed: 0,
+      upspeed: 0,
+      eta: 3600,
+      state: 'downloading',
+      ratio: 0,
+      category: opts.category ?? '',
+      save_path: opts.savepath ?? '/mnt/storage/media',
+    });
+    return Promise.resolve();
+  }
+
   public controlTorrents(action: 'pause' | 'resume' | 'recheck', hashes: readonly string[]) {
     for (const t of this.state.qbitTorrents) {
       if (hashes.includes(t.hash)) {
@@ -839,6 +867,81 @@ export class MockQbittorrentConnector implements QbittorrentConnector {
   public deleteTorrents(hashes: readonly string[], _deleteFiles: boolean) {
     this.state.qbitTorrents = this.state.qbitTorrents.filter((t) => !hashes.includes(t.hash));
     return Promise.resolve();
+  }
+}
+
+export class MockJackettConnector implements JackettConnector {
+  private readonly indexersList: JackettIndexer[] = [
+    { id: 'indexer-fast', title: 'Fast Indexer', categories: ['2000', '5000', '5070'] },
+    { id: 'indexer-slow', title: 'Slow Indexer', categories: ['2000', '5000'] },
+  ];
+
+  public listIndexers(): Promise<JackettIndexer[]> {
+    return Promise.resolve([...this.indexersList]);
+  }
+
+  public search(opts: {
+    query: string;
+    indexers?: readonly string[] | undefined;
+    excludeIndexers?: readonly string[] | undefined;
+    categories?: readonly number[] | undefined;
+    timeoutMs?: number | undefined;
+  }): Promise<{ results: JackettSearchResult[]; indexers: JackettIndexerRunStat[] }> {
+    const exclude = new Set((opts.excludeIndexers ?? []).map((s) => s.toLowerCase()));
+    const targetIds =
+      opts.indexers && opts.indexers.length > 0
+        ? [...opts.indexers]
+        : this.indexersList.map((i) => i.id).filter((id) => !exclude.has(id.toLowerCase()));
+
+    const q = opts.query.trim();
+    const results: JackettSearchResult[] = [];
+    const stats: JackettIndexerRunStat[] = [];
+
+    for (const id of targetIds) {
+      if (id === 'indexer-fast') {
+        stats.push({ id, name: 'Fast Indexer', status: 'ok', results_count: 1, elapsed_ms: 180 });
+        results.push({
+          title: `${q} 1080p WEB-DL`,
+          indexer_id: 'indexer-fast',
+          indexer: 'Fast Indexer',
+          size_bytes: 2_400_000_000,
+          seeders: 42,
+          leechers: 5,
+          category: 'Movies/HD',
+          published_at: '2026-11-20T10:00:00Z',
+          info_hash: '1111111111111111111111111111111111111111',
+          magnet_uri: `magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=${encodeURIComponent(q)}`,
+          download_link: null,
+        });
+      } else if (id === 'indexer-slow') {
+        stats.push({ id, name: 'Slow Indexer', status: 'ok', results_count: 1, elapsed_ms: 4200 });
+        results.push({
+          title: `${q} 1080p BluRay`,
+          indexer_id: 'indexer-slow',
+          indexer: 'Slow Indexer',
+          size_bytes: 4_800_000_000,
+          seeders: 185,
+          leechers: 12,
+          category: 'Movies/HD',
+          published_at: '2026-11-22T12:00:00Z',
+          info_hash: '2222222222222222222222222222222222222222',
+          magnet_uri: null,
+          download_link: 'http://127.0.0.1:9117/dl/indexer-slow/?jackett_apikey=mock&file=bluray',
+        });
+      }
+    }
+
+    return Promise.resolve({ results, indexers: stats });
+  }
+
+  public resolveDownload(_downloadLink: string): Promise<JackettResolvedDownload> {
+    return Promise.resolve({
+      kind: 'torrent',
+      filename: 'mock-bluray.torrent',
+      data: new Uint8Array([
+        0x64, 0x38, 0x3a, 0x61, 0x6e, 0x6e, 0x6f, 0x75, 0x6e, 0x63, 0x65, 0x65,
+      ]),
+    });
   }
 }
 

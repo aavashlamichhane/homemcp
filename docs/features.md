@@ -1,6 +1,6 @@
 # Feature Catalog & Capabilities
 
-`homemcp` exposes **134 MCP tools across 15 toolsets**, **9 MCP resources**, and **8 workflow prompts**, protected by OAuth 2.1 + PKCE, WebAuthn passkeys, risk tiers (`T0`–`T3`), strict Compose policy, and centralized secret redaction.
+`homemcp` exposes **136 MCP tools across 15 toolsets**, **9 MCP resources**, and **8 workflow prompts**, protected by OAuth 2.1 + PKCE, WebAuthn passkeys, risk tiers (`T0`–`T3`), strict Compose policy, and centralized secret redaction.
 
 For an auto-generated, schema-exact table of every tool, resource URI, and prompt, see [docs/tools.md](./tools.md).
 
@@ -70,10 +70,10 @@ See [docs/backups.md](./backups.md) for full details:
 - **Navidrome Subsonic API (`music`):** Search tracks/artists/albums (`music_search`), inspect playlists (`music_playlists_list`, `music_playlist_get`), batch-match songs (`music_find_tracks`), end-to-end playlist builder (`music_build_playlist` / `music_build_playlist_apply`), manage playlists (`music_playlist_create`, `music_playlist_update`, `music_playlist_delete`, `music_smart_playlist_create`), and check/refresh library state (`music_library_stats`, `music_scan`, `music_recently_added`, `music_now_playing`).
 - **NaviLoad Downloader (`naviload`):** Inspect service health/queue (`naviload_health`, `naviload_queue`), search or inspect YouTube candidates (`naviload_search_youtube`, `naviload_inspect`), download tracks (`naviload_download`), perform human-confirmed tag review (`naviload_review_list`, `naviload_review_decide`), publish to Navidrome (`naviload_save`), and retry/cancel jobs (`naviload_retry`, `naviload_cancel`).
 
-### 9. Media Server & Torrents (`media` — 12 tools, `downloads` — 5 tools)
+### 9. Media Server & Torrents (`media` — 12 tools, `downloads` — 7 tools)
 
 - **Jellyfin (`media`):** Server health, libraries, recently added items, search, active playback sessions, scheduled tasks, user list, activity log, library diagnostics, and media filename standardization (`jellyfin_health`, `jellyfin_libraries`, `jellyfin_recently_added`, `jellyfin_search`, `jellyfin_sessions`, `jellyfin_scheduled_tasks`, `jellyfin_run_task`, `jellyfin_users`, `jellyfin_activity_log`, `jellyfin_find_problems`, `media_rename_plan`, `media_rename_apply`).
-- **qBittorrent (`downloads`):** Filtered/sorted status (`downloads_status`), torrent file/tracker inspection (`downloads_inspect`), add magnet/URL with disk-space guard (`downloads_add`), 4.6.x/5.x-compatible pause/resume/recheck (`downloads_control`), and plan-first removal (`downloads_remove`).
+- **Jackett + qBittorrent (`downloads`):** Jackett indexer listing (`downloads_indexers`), parallel seeder-ranked search waiting for slow indexers (`downloads_search`), filtered/sorted qBittorrent status (`downloads_status`), torrent file/tracker inspection (`downloads_inspect`), add magnet/URL/`result_id` with disk-space guard (`downloads_add`), 4.6.x/5.x-compatible pause/resume/recheck (`downloads_control`), and plan-first removal (`downloads_remove`).
 
 ### 10. Alerting & Offline Notification Queue (`alerts` — 6 tools)
 

@@ -193,6 +193,15 @@ export const HomemcpConfigSchema = z
           })
           .strict()
           .optional(),
+        jackett: z
+          .object({
+            url: z.string().url(),
+            apiKey: EnvRefSchema,
+            defaultTimeoutSeconds: z.number().int().min(5).max(120).default(55),
+            excludeIndexers: z.array(z.string()).default([]),
+          })
+          .strict()
+          .optional(),
         alerts: z
           .object({
             ntfy: z

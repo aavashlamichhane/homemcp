@@ -55,6 +55,12 @@ export interface QbittorrentConnector {
     category?: string | undefined;
     savepath?: string | undefined;
   }): Promise<void>;
+  addTorrentFile(opts: {
+    filename: string;
+    data: Uint8Array;
+    category?: string | undefined;
+    savepath?: string | undefined;
+  }): Promise<void>;
   controlTorrents(action: 'pause' | 'resume' | 'recheck', hashes: readonly string[]): Promise<void>;
   deleteTorrents(hashes: readonly string[], deleteFiles: boolean): Promise<void>;
 }
@@ -156,6 +162,40 @@ export class HttpQbittorrentConnector implements QbittorrentConnector {
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     });
+  }
+
+  public async addTorrentFile(opts: {
+    filename: string;
+    data: Uint8Array;
+    category?: string | undefined;
+    savepath?: string | undefined;
+  }): Promise<void> {
+    const form = new FormData();
+    const bytes = new Uint8Array(opts.data.byteLength);
+    bytes.set(opts.data);
+    form.append('torrents', new Blob([bytes], { type: 'application/x-bittorrent' }), opts.filename);
+    if (opts.category) form.set('category', opts.category);
+    if (opts.savepath) form.set('savepath', opts.savepath);
+    const cookie = this.sidCookie ?? (await this.login());
+    let resp = await fetch(`${this.baseUrl}/api/v2/torrents/add`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+      body: form,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (resp.status === 401 || resp.status === 403) {
+      this.sidCookie = undefined;
+      const freshCookie = await this.login();
+      resp = await fetch(`${this.baseUrl}/api/v2/torrents/add`, {
+        method: 'POST',
+        headers: { Cookie: freshCookie },
+        body: form,
+        signal: AbortSignal.timeout(15_000),
+      });
+    }
+    if (!resp.ok) {
+      throw new HomemcpError('UPSTREAM_UNAVAILABLE', `qBittorrent HTTP ${resp.status}`);
+    }
   }
 
   public async controlTorrents(
